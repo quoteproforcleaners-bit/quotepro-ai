@@ -263,6 +263,12 @@ const router = Router();
       dispatchWebhook(business.id, req.session.userId!, "quote.created", { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
       trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_CREATED, { quoteId: q.id, total: q.total }).catch(() => {});
 
+      // Flip first-quote gate flag (idempotent — no-op if already true)
+      pool.query(
+        "UPDATE users SET has_completed_first_quote = true WHERE id = $1 AND has_completed_first_quote = false",
+        [req.session.userId!]
+      ).catch(() => {});
+
       return res.json(q);
     } catch (error: any) {
       console.error("Create quote error:", error);

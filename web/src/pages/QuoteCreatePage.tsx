@@ -336,7 +336,12 @@ export default function QuoteCreatePage() {
           // non-fatal — quote was created successfully
         }
       }
-      navigate(`/quotes/${data.id}`);
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("from") === "onboarding") {
+        navigate(`/onboarding/complete?quoteId=${data.id}`);
+      } else {
+        navigate(`/quotes/${data.id}`);
+      }
     },
     onError: (err: any) => {
       const isQuotaHit = err?.data?.quoteLimitReached || err?.message?.toLowerCase().includes("free quotes") || err?.message?.toLowerCase().includes("quote limit");

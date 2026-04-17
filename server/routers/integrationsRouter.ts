@@ -81,6 +81,55 @@ import { google } from "googleapis";
 
 const router = Router();
 
+  router.get("/internal/market-benchmark", async (req: Request, res: Response) => {
+    try {
+      const { zip, job_type, sqft } = req.query as { zip?: string; job_type?: string; sqft?: string };
+      if (!zip && !job_type) {
+        return res.status(400).json({ message: "zip or job_type required" });
+      }
+
+      const conditions: string[] = ["q.deleted_at IS NULL", "q.total IS NOT NULL", "q.total > 0"];
+      const params: any[] = [];
+
+      if (zip) {
+        params.push(zip);
+        conditions.push(`(q.property_details->>'zip' = $${params.length} OR q.property_details->>'address' ILIKE $${params.length})`);
+      }
+      if (job_type) {
+        params.push(job_type);
+        conditions.push(`q.service_name ILIKE $${params.length}`);
+      }
+      if (sqft) {
+        const sqftNum = parseInt(sqft, 10);
+        if (!isNaN(sqftNum)) {
+          params.push(sqftNum * 0.7);
+          params.push(sqftNum * 1.3);
+          conditions.push(`(q.property_details->>'sqft')::numeric BETWEEN $${params.length - 1} AND $${params.length}`);
+        }
+      }
+
+      const whereClause = conditions.join(" AND ");
+      const result = await pool.query(
+        `SELECT
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY q.total) AS p50,
+           COUNT(*) AS sample_size
+         FROM quotes q
+         WHERE ${whereClause}`,
+        params
+      );
+
+      const row = result.rows[0];
+      const sampleSize = parseInt(row.sample_size, 10);
+      if (sampleSize < 10) {
+        return res.json({ p50: null, sample_size: sampleSize });
+      }
+      return res.json({ p50: parseFloat(row.p50), sample_size: sampleSize });
+    } catch (error: any) {
+      console.error("Market benchmark error:", error);
+      return res.status(500).json({ message: "Failed to compute benchmark" });
+    }
+  });
+
   router.post("/internal/cron", async (_req: Request, res: Response) => {
     try {
       const expiredCount = await expireOldQuotes();

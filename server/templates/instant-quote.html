@@ -403,6 +403,7 @@ var storedTotal={{storedTotal}};
 var expiresAt={{expiresAtMs}};
 var depositRequired={{depositRequired}};
 var depositAmount={{depositAmountNum}};
+var previewMode={{previewMode}};
 
 function updateAddonsForTier(tierKey){
   var included=optionAddOnsIncluded[tierKey]||[];
@@ -441,6 +442,9 @@ function selectOption(key){
   updateAddonsForTier(key);
   updateTotals();
   trackEvent("quote_option_selected",{option:key});
+  if(previewMode&&window.parent!==window){
+    window.parent.postMessage({type:"qp_tier_click",tier:key},"*");
+  }
 }
 
 function toggleAddon(el,key){
@@ -512,7 +516,25 @@ function toggleDay(el){
   el.classList.toggle("checked");
 }
 
+function showPreviewToast(msg){
+  var t=document.getElementById("previewToast");
+  if(!t){
+    t=document.createElement("div");
+    t.id="previewToast";
+    t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0F172A;color:#fff;padding:14px 22px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;max-width:360px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.25);transition:opacity 0.3s";
+    document.body.appendChild(t);
+  }
+  t.textContent=msg||"This is a preview — no real action recorded.";
+  t.style.opacity="1";
+  clearTimeout(t._timer);
+  t._timer=setTimeout(function(){t.style.opacity="0"},3500);
+}
+
 function showAcceptModal(){
+  if(previewMode){
+    showPreviewToast("This is a preview. When a real customer accepts, you'll get notified instantly.");
+    return;
+  }
   if(!selectedOption&&optionData.length>1){
     var cards=document.querySelectorAll(".option-card");
     if(cards.length>0){cards[0].scrollIntoView({behavior:"smooth",block:"center"})}
@@ -607,6 +629,10 @@ async function handleAccept(){
 }
 
 async function handleDecline(){
+  if(previewMode){
+    showPreviewToast("This is a preview. A real customer could decline here — you'd see it instantly in QuotePro.");
+    return;
+  }
   if(!confirm("Are you sure you want to decline this quote?"))return;
   try{
     var r=await fetch("/q/"+token+"/decline",{method:"POST",headers:{"Content-Type":"application/json"}});
@@ -654,6 +680,7 @@ function updateExpiry(){
 if(expiresAt){updateExpiry();setInterval(updateExpiry,60000)}
 
 function trackEvent(name,data){
+  if(previewMode)return;
   try{fetch("/q/"+token+"/track",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:name,data:data||{}})})}catch(e){}
 }
 

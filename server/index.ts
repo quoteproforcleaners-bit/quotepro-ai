@@ -396,6 +396,18 @@ function configureExpoAndLanding(app: express.Application) {
       });
     }
 
+    // Sub-paths for the first-quote onboarding gate (SPA routes)
+    app.get("/onboarding/first-quote", (_req: Request, res: Response) => {
+      const indexPath = path.join(webDistPath, "index.html");
+      if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+      res.status(404).send("Not found");
+    });
+    app.get("/onboarding/complete", (_req: Request, res: Response) => {
+      const indexPath = path.join(webDistPath, "index.html");
+      if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+      res.status(404).send("Not found");
+    });
+
     // Public commercial cleaning calculator — inject SEO meta tags server-side
     app.get("/commercial-cleaning-calculator", (_req: Request, res: Response) => {
       const indexPath = path.join(webDistPath, "index.html");

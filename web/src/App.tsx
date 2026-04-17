@@ -11,6 +11,7 @@ import { ThemeProvider } from "./lib/theme";
 import { WalkthroughProvider } from "./lib/walkthrough";
 import { WebAIConsentProvider } from "./lib/webAIConsent";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { FirstQuoteGate } from "./components/FirstQuoteGate";
 import { ProGate } from "./components/ProGate";
 import { Layout } from "./components/Layout";
 import LandingPage from "./pages/LandingPage";
@@ -95,6 +96,8 @@ import NPSDashboardPage from "./pages/NPSDashboardPage";
 import PhantomAccountsPage from "./pages/PhantomAccountsPage";
 import WhatsNewModal from "./components/WhatsNewModal";
 import FinancePage from "./pages/FinancePage";
+import FirstQuotePage from "./pages/onboarding/FirstQuotePage";
+import OnboardingCompletePage from "./pages/onboarding/OnboardingCompletePage";
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 const MAPS_LIBRARIES: ("places")[] = ["places"];
@@ -192,10 +195,30 @@ export default function App() {
           }
         />
 
+        {/* First-quote gate onboarding — full-screen, no sidebar */}
+        <Route
+          path="/onboarding/first-quote"
+          element={
+            <ProtectedRoute>
+              <FirstQuotePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/onboarding/complete"
+          element={
+            <ProtectedRoute>
+              <OnboardingCompletePage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           element={
             <ProtectedRoute>
-              <Layout />
+              <FirstQuoteGate>
+                <Layout />
+              </FirstQuoteGate>
             </ProtectedRoute>
           }
         >

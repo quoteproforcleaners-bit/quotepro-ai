@@ -19,6 +19,7 @@ interface User {
   name?: string;
   activeLocationId?: string | null;
   isMultiLocationEnabled?: boolean;
+  hasCompletedFirstQuote?: boolean;
 }
 
 interface Business {

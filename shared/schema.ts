@@ -75,6 +75,7 @@ export const users = pgTable("users", {
   activationNudge48hSent: boolean("activation_nudge_48h_sent").notNull().default(false),
   activationNudge70hSent: boolean("activation_nudge_70h_sent").notNull().default(false),
   smsOptedOut: boolean("sms_opted_out").notNull().default(false),
+  hasCompletedFirstQuote: boolean("has_completed_first_quote").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

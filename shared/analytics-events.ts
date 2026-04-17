@@ -13,6 +13,13 @@ export const AnalyticsEvents = {
   INVALID_FILE_UPLOAD_REJECTED: "invalid_file_upload_rejected",
 
   // ─── Activation (first value moments) ──────────────────────────────────────
+  ONBOARDING_GATE_STARTED: "onboarding_gate_started",
+  ONBOARDING_GATE_OPTION_SELECTED: "onboarding_gate_option_selected",
+  ONBOARDING_GATE_QUOTE_GENERATED: "onboarding_gate_quote_generated",
+  ONBOARDING_GATE_PREVIEW_VIEWED: "onboarding_gate_preview_viewed",
+  ONBOARDING_GATE_PREVIEW_TIER_CLICKED: "onboarding_gate_preview_tier_clicked",
+  ONBOARDING_GATE_COMPLETED: "onboarding_gate_completed",
+  ONBOARDING_GATE_ABANDONED: "onboarding_gate_abandoned",
   ONBOARDING_COMPLETED: "onboarding_completed",
   ONBOARDING_STALLED_72H: "onboarding_stalled_72h",
   FIRST_QUOTE_CREATED: "first_quote_created",

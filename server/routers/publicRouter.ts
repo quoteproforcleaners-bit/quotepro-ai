@@ -935,8 +935,9 @@ init();
       const companyName = escHtml(business?.companyName || "Our Company");
       const logoUri = escHtml(business?.logoUri || "");
 
+      const isPreview = req.query.preview === "1";
       try {
-        if (!q.viewedAt) {
+        if (!q.viewedAt && !isPreview) {
           await updateQuote(q.id, { viewedAt: new Date() } as any);
 
           // Push: notify business owner that their quote was just viewed
@@ -1579,6 +1580,7 @@ loadMonth(nextMo);
         "{{businessEmail}}": escHtml(business?.email || ""),
         "{{frequencyLabel}}": frequencyLabel,
         "{{storedTotal}}": String(totalNum),
+        "{{previewMode}}": isPreview ? "true" : "false",
       };
 
       for (const [key, val] of Object.entries(replacements)) {

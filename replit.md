@@ -22,8 +22,9 @@ A PostgreSQL Database, powered by Neon, is used with Drizzle ORM. Session manage
 The system uses session-based authentication supporting email/password, Apple, and Google SSO.
 
 ### Core Functionality
+- **First-Quote Onboarding Gate**: New users cannot access the dashboard or any nav until they generate their first quote. Gate routes to `/onboarding/first-quote`, then `/onboarding/complete` which shows an iframe preview of the live customer quote view (`?preview=1` param disables analytics/tracking). Gate skips for existing users via `has_completed_first_quote` DB flag (backfilled).
 - **Quote Calculation Engine**: A flexible engine that calculates base hours and applies multipliers, supporting customizable service types, discounts, add-ons, and AI-powered commercial quoting.
-- **Instant Quote Page**: Public-facing pages allowing customers to view, accept quotes, select tiers, toggle add-ons, make deposit payments, and view testimonials.
+- **Instant Quote Page**: Public-facing pages allowing customers to view, accept quotes, select tiers, toggle add-ons, make deposit payments, and view testimonials. Supports `?preview=1` parameter for operator previews (disables view logging, push notifications, follow-up creation, and accept/decline actions).
 - **AI Features**: Includes an AI Agent with "My Business", "Coach Me", and "Teach Me" modes; Walkthrough AI Quoting for structured details from natural language; AI Closing Assistant for customer messages; and AI Dynamic Pricing Suggestions.
 - **Job Management**: Provides detailed job scheduling, status tracking, and customer-facing updates.
 - **AI Follow-Up Automation**: Automatically schedules and sends AI-generated follow-up messages for unaccepted quotes.

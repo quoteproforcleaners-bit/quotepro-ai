@@ -1327,6 +1327,7 @@ export function formatUser(u: any) {
     activeLocationId: u.activeLocationId ?? u.active_location_id ?? null,
     isMultiLocationEnabled: !!(u.isMultiLocationEnabled ?? u.is_multi_location_enabled ?? false),
     autopilotEnabled: !!(u.autopilotEnabled ?? u.autopilot_enabled ?? false),
+    hasCompletedFirstQuote: !!(u.hasCompletedFirstQuote ?? u.has_completed_first_quote ?? false),
   };
 }
 
