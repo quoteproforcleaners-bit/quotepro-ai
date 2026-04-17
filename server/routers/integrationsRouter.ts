@@ -83,6 +83,17 @@ const router = Router();
 
   router.get("/internal/market-benchmark", requireAuth, async (req: Request, res: Response) => {
     try {
+      // Only accessible during onboarding — once a user has sent their first quote
+      // has_completed_first_quote flips to true and this endpoint is no longer needed.
+      // This prevents authenticated users from scraping cross-tenant pricing data.
+      const userCheck = await pool.query(
+        "SELECT has_completed_first_quote FROM users WHERE id = $1",
+        [req.session.userId]
+      );
+      if (!userCheck.rows[0] || userCheck.rows[0].has_completed_first_quote) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       const { zip, job_type, sqft } = req.query as { zip?: string; job_type?: string; sqft?: string };
       if (!zip && !job_type) {
         return res.status(400).json({ message: "zip or job_type required" });
