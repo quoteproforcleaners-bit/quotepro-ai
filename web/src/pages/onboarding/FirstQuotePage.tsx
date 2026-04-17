@@ -5,6 +5,7 @@ import { useAuth } from "../../lib/auth";
 import { apiPost, apiDelete } from "../../lib/api";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
 import AddressAutocompleteLine from "../../components/AddressAutocompleteLine";
+import { Toast } from "../../components/ui";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   apiPost("/api/analytics/events", { eventName, properties: properties || {} }).catch(() => {});
@@ -118,6 +119,7 @@ export default function FirstQuotePage() {
   const [apiError, setApiError] = useState<string | undefined>();
   const [failureCount, setFailureCount] = useState(0);
   const [isServerOrRateLimitError, setIsServerOrRateLimitError] = useState(false);
+  const [skipWarning, setSkipWarning] = useState<string | null>(null);
 
   useEffect(() => {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_STARTED);
@@ -125,7 +127,12 @@ export default function FirstQuotePage() {
 
   async function handleSkip() {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
-    await apiPost("/api/quotes/onboarding-skip", {}).catch(() => {});
+    try {
+      await apiPost("/api/quotes/onboarding-skip", {});
+    } catch (err) {
+      console.error("[handleSkip] onboarding-skip API call failed:", err);
+      setSkipWarning("Couldn't save your progress — you may see this screen again");
+    }
     await refresh();
     navigate("/dashboard");
   }
@@ -233,6 +240,13 @@ export default function FirstQuotePage() {
 
   return (
     <div style={styles.page}>
+      {skipWarning && (
+        <Toast
+          message={skipWarning}
+          variant="error"
+          onClose={() => setSkipWarning(null)}
+        />
+      )}
       <div style={styles.logoRow}>
         <span style={styles.logo}>QuotePro</span>
       </div>
