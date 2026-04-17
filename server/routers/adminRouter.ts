@@ -346,45 +346,74 @@ const router = Router();
     if (!checkAdminKey(req, res)) return;
     try {
       const result = await pool.query(`
-        SELECT
-          COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_started'
-            THEN business_id END)::int AS businesses_started,
-          COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
-            AND properties->>'option' = 'real_lead' THEN business_id END)::int AS chose_real_lead,
-          COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
-            AND properties->>'option' = 'own_home' THEN business_id END)::int AS chose_own_home,
-          COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_quote_generated'
-            THEN business_id END)::int AS succeeded,
-          COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
-            AND properties->>'option' = 'skipped_after_error' THEN business_id END)::int AS skipped,
-          COUNT(DISTINCT CASE
-            WHEN event_name = 'onboarding_gate_quote_generated'
-              AND properties->>'failureCount' IS NOT NULL
-              AND (properties->>'failureCount')::int > 0
-            THEN business_id END)::int AS retried_and_succeeded,
-          COUNT(DISTINCT CASE
-            WHEN (
-              event_name = 'onboarding_gate_quote_generated'
+        WITH per_business AS (
+          SELECT
+            business_id,
+            COUNT(*) FILTER (
+              WHERE event_name = 'onboarding_gate_option_selected'
+                AND properties->>'option' = 'own_home'
+            )::int AS own_home_attempts,
+            COUNT(*) FILTER (
+              WHERE event_name = 'onboarding_gate_quote_generated'
+            )::int AS quote_generated_count
+          FROM analytics_events
+          WHERE event_name IN (
+            'onboarding_gate_option_selected',
+            'onboarding_gate_quote_generated'
+          )
+          GROUP BY business_id
+        ),
+        retry_stats AS (
+          SELECT
+            COUNT(*) FILTER (WHERE own_home_attempts >= 2)::int AS retried_businesses,
+            COUNT(*) FILTER (WHERE own_home_attempts >= 2 AND quote_generated_count > 0)::int AS retried_then_succeeded
+          FROM per_business
+        ),
+        agg AS (
+          SELECT
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_started'
+              THEN business_id END)::int AS businesses_started,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
+              AND properties->>'option' = 'real_lead' THEN business_id END)::int AS chose_real_lead,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
+              AND properties->>'option' = 'own_home' THEN business_id END)::int AS chose_own_home,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_quote_generated'
+              THEN business_id END)::int AS succeeded,
+            COUNT(DISTINCT CASE WHEN event_name = 'onboarding_gate_option_selected'
+              AND properties->>'option' = 'skipped_after_error' THEN business_id END)::int AS skipped,
+            COUNT(DISTINCT CASE
+              WHEN event_name = 'onboarding_gate_quote_generated'
                 AND properties->>'failureCount' IS NOT NULL
-                AND (properties->>'failureCount')::int >= 2
-            ) OR (
-              event_name = 'onboarding_gate_option_selected'
-                AND properties->>'option' = 'skipped_after_error'
-                AND properties->>'failureCount' IS NOT NULL
-                AND (properties->>'failureCount')::int >= 2
-            )
-            THEN business_id END)::int AS failed_twice_kept_trying
-        FROM analytics_events
-        WHERE event_name IN (
-          'onboarding_gate_started',
-          'onboarding_gate_option_selected',
-          'onboarding_gate_quote_generated'
+                AND (properties->>'failureCount')::int > 0
+              THEN business_id END)::int AS retried_and_succeeded,
+            COUNT(DISTINCT CASE
+              WHEN (
+                event_name = 'onboarding_gate_quote_generated'
+                  AND properties->>'failureCount' IS NOT NULL
+                  AND (properties->>'failureCount')::int >= 2
+              ) OR (
+                event_name = 'onboarding_gate_option_selected'
+                  AND properties->>'option' = 'skipped_after_error'
+                  AND properties->>'failureCount' IS NOT NULL
+                  AND (properties->>'failureCount')::int >= 2
+              )
+              THEN business_id END)::int AS failed_twice_kept_trying
+          FROM analytics_events
+          WHERE event_name IN (
+            'onboarding_gate_started',
+            'onboarding_gate_option_selected',
+            'onboarding_gate_quote_generated'
+          )
         )
+        SELECT agg.*, retry_stats.retried_businesses, retry_stats.retried_then_succeeded
+        FROM agg, retry_stats
       `);
       const row = result.rows[0] ?? {};
       const started = Number(row.businesses_started ?? 0);
       const succeeded = Number(row.succeeded ?? 0);
       const skipped = Number(row.skipped ?? 0);
+      const retriedBusinesses = Number(row.retried_businesses ?? 0);
+      const retriedThenSucceeded = Number(row.retried_then_succeeded ?? 0);
       return res.json({
         businesses_started: started,
         chose_real_lead: Number(row.chose_real_lead ?? 0),
@@ -395,6 +424,11 @@ const router = Router();
         failed_twice_kept_trying: Number(row.failed_twice_kept_trying ?? 0),
         conversion_rate_pct: started > 0 ? Math.round((succeeded / started) * 100) : 0,
         skip_rate_pct: started > 0 ? Math.round((skipped / started) * 100) : 0,
+        retried_businesses: retriedBusinesses,
+        retried_then_succeeded: retriedThenSucceeded,
+        retry_success_rate_pct: retriedBusinesses > 0
+          ? Math.round((retriedThenSucceeded / retriedBusinesses) * 100)
+          : 0,
       });
     } catch (err: any) {
       console.error("GET /api/admin/onboarding-funnel error:", err.message);
