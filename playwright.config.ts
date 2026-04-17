@@ -21,7 +21,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run server:dev",
+    command: "NODE_ENV=test tsx server/index.ts",
     url: "http://localhost:5000",
     timeout: 60000,
     reuseExistingServer: !process.env.CI,

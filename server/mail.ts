@@ -55,6 +55,13 @@ export function getBusinessSendParams(business: any): {
 export async function sendEmail(opts: SendEmailOptions): Promise<void> {
   const key = process.env.SENDGRID_API_KEY;
   if (!key) {
+    if (process.env.NODE_ENV === "test") {
+      console.log("[mail] TEST MODE — skipping email send (no SENDGRID_API_KEY)", {
+        to: opts.to,
+        subject: opts.subject,
+      });
+      return;
+    }
     throw new Error("SENDGRID_API_KEY must be set to enable email delivery.");
   }
 

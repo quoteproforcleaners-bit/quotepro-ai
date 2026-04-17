@@ -96,10 +96,6 @@ jobs:
       DATABASE_URL: postgresql://testuser:testpassword@localhost:5432/testdb
       NODE_ENV: test
       SESSION_SECRET: ${{ secrets.SESSION_SECRET || 'ci-session-secret-not-for-production' }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
 
     steps:
       - name: Checkout
@@ -116,6 +112,9 @@ jobs:
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
+
+      - name: Build web app
+        run: cd web && npx vite build
 
       - name: Push database schema
         run: npm run db:push
