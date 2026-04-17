@@ -765,7 +765,7 @@ export default function QuoteDetailPage() {
  ...(msgChannel ==="email"? { subject } : {}),
  ...(msgPurpose ==="send_quote"&& msgChannel ==="email"? { quoteId: quote.id } : {}),
  });
- showToast("Email sent!","success");
+ showToast("Email sent! If they don't see it, ask them to check their spam folder.","success");
  setAiDrafts((prev) => ({ ...prev, [currentDraftKey]:""}));
  } catch (e: any) {
  showToast(e?.message ||"Failed to send","error");
@@ -843,7 +843,7 @@ export default function QuoteDetailPage() {
      subject: rec.title || "A message from us",
    });
    recMutation.mutate({ recId: rec.id, status: "done" });
-   showToast("Email sent!", "success");
+   showToast("Email sent! If they don't see it, ask them to check their spam folder.", "success");
    setPlayDrafts((prev) => ({ ...prev, [recIndex]: "" }));
    setExpandedRec(null);
  } catch (e: any) {
