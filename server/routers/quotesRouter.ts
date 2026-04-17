@@ -276,6 +276,20 @@ const router = Router();
     }
   });
 
+  // Allow users to skip the first-quote gate after repeated failures
+  router.post("/quotes/onboarding-skip", requireAuth, async (req: Request, res: Response) => {
+    try {
+      await pool.query(
+        "UPDATE users SET has_completed_first_quote = true WHERE id = $1",
+        [req.session.userId!]
+      );
+      return res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Onboarding skip error:", error);
+      return res.status(500).json({ message: "Failed to update onboarding status" });
+    }
+  });
+
   router.put("/quotes/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);

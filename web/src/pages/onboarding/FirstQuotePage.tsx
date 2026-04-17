@@ -14,11 +14,15 @@ function AddressForm({
   onSubmit,
   loading,
   error,
+  failureCount,
+  onSkip,
 }: {
   initialAddress: string;
   onSubmit: (data: { address: string; beds: number; baths: number; sqft: number }) => void;
   loading: boolean;
   error?: string;
+  failureCount: number;
+  onSkip: () => void;
 }) {
   const [address, setAddress] = useState(initialAddress);
   const [beds, setBeds] = useState(3);
@@ -80,11 +84,27 @@ function AddressForm({
         </div>
       </div>
       {error && (
-        <p style={{ color: "#DC2626", fontSize: 13, marginBottom: 12 }}>{error}</p>
+        <div style={styles.errorBox}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{error}</span>
+        </div>
       )}
       <button type="submit" style={styles.primaryBtn} disabled={loading}>
-        {loading ? "Generating quote..." : "Generate my quote"}
+        {loading ? "Generating quote..." : failureCount > 0 ? "Try again" : "Generate my quote"}
       </button>
+      {failureCount >= 2 && (
+        <button
+          type="button"
+          style={styles.skipLink}
+          onClick={onSkip}
+        >
+          Skip this step and go to the dashboard
+        </button>
+      )}
     </form>
   );
 }
@@ -94,10 +114,17 @@ export default function FirstQuotePage() {
   const { user, business } = useAuth();
   const [mode, setMode] = useState<"select" | "own_home">("select");
   const [apiError, setApiError] = useState<string | undefined>();
+  const [failureCount, setFailureCount] = useState(0);
 
   useEffect(() => {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_STARTED);
   }, []);
+
+  async function handleSkip() {
+    trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
+    await apiPost("/api/quotes/onboarding-skip", {}).catch(() => {});
+    navigate("/dashboard");
+  }
 
   const createQuoteMutation = useMutation({
     mutationFn: async (data: { address: string; beds: number; baths: number; sqft: number }) => {
@@ -145,8 +172,9 @@ export default function FirstQuotePage() {
       trackEvent(AnalyticsEvents.ONBOARDING_GATE_QUOTE_GENERATED, { option: "own_home" });
       navigate(`/onboarding/complete?quoteId=${data.id}`);
     },
-    onError: (err: any) => {
-      setApiError(err?.message || "Could not generate quote. Please try again.");
+    onError: () => {
+      setFailureCount((prev) => prev + 1);
+      setApiError("Something went wrong generating your quote. Please try again.");
     },
   });
 
@@ -217,7 +245,7 @@ export default function FirstQuotePage() {
           <div style={styles.ownHomeWrap}>
             <button
               style={styles.backLink}
-              onClick={() => { setMode("select"); setApiError(undefined); }}
+              onClick={() => { setMode("select"); setApiError(undefined); setFailureCount(0); }}
             >
               &larr; Back
             </button>
@@ -228,6 +256,8 @@ export default function FirstQuotePage() {
               onSubmit={(d) => { setApiError(undefined); createQuoteMutation.mutate(d); }}
               loading={createQuoteMutation.isPending}
               error={apiError}
+              failureCount={failureCount}
+              onSkip={handleSkip}
             />
           </div>
         )}
@@ -408,5 +438,30 @@ const styles: Record<string, React.CSSProperties> = {
     outline: "none",
     boxSizing: "border-box" as const,
     background: "#fff",
+  },
+  errorBox: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    background: "#FEF2F2",
+    border: "1px solid #FECACA",
+    borderRadius: 10,
+    padding: "10px 14px",
+    marginBottom: 12,
+    fontSize: 13,
+    color: "#DC2626",
+    lineHeight: 1.5,
+  },
+  skipLink: {
+    background: "none",
+    border: "none",
+    color: "#94A3B8",
+    fontSize: 13,
+    cursor: "pointer",
+    textDecoration: "underline",
+    marginTop: 12,
+    padding: "4px 0",
+    textAlign: "center" as const,
+    width: "100%",
   },
 };
