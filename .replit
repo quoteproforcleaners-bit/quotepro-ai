@@ -88,3 +88,7 @@ ADMIN_EMAILS = "mquealy01@gmail.com"
 
 [userenv.production]
 EXPO_PUBLIC_DOMAIN = "app.getquotepro.ai"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
