@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { AlertTriangle, ShieldOff, CheckCircle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ShieldOff, CheckCircle, RefreshCw, ChevronDown, ChevronUp, TrendingUp } from "lucide-react";
 import { apiPost } from "../lib/api";
 
 interface OnboardingFunnel {
@@ -364,6 +364,9 @@ export default function PhantomAccountsPage() {
           </div>
         )}
 
+        {/* Onboarding Gate trend */}
+        <OnboardingGatePanel secret={secret} />
+
         {/* Grant tier tool */}
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginTop: 28 }}>
           <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Grant / Change Tier</h2>
@@ -425,3 +428,185 @@ const thStyle: React.CSSProperties = {
   color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em",
 };
 const tdStyle: React.CSSProperties = { padding: "12px 16px", verticalAlign: "top" };
+
+interface OnboardingFunnelDay {
+  day: string;
+  started: number;
+  succeeded: number;
+  skipped: number;
+}
+
+interface OnboardingFunnelData {
+  businesses_started: number;
+  succeeded: number;
+  skipped: number;
+  conversion_rate_pct: number;
+  skip_rate_pct: number;
+  retry_success_rate_pct: number;
+  window_days: number;
+  daily: OnboardingFunnelDay[];
+}
+
+function OnboardingGatePanel({ secret }: { secret: string }) {
+  const [days, setDays] = useState<7 | 14 | 30>(7);
+  const [data, setData] = useState<OnboardingFunnelData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/admin/onboarding-funnel?days=${days}`,
+          { headers: { "x-admin-key": secret } },
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+        if (!cancelled) setData(json);
+      } catch (e: any) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [days, secret]);
+
+  const daily = data?.daily ?? [];
+  const maxValue = Math.max(
+    1,
+    ...daily.map((d) => Math.max(d.started, d.succeeded, d.skipped)),
+  );
+
+  return (
+    <div
+      data-testid="panel-onboarding-gate"
+      style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 24, marginTop: 28 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <TrendingUp size={18} color="#7c3aed" />
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>Onboarding Gate Trend</h2>
+        </div>
+        <div style={{ display: "flex", gap: 4, background: "#f1f5f9", borderRadius: 8, padding: 3 }}>
+          {([7, 14, 30] as const).map((d) => (
+            <button
+              key={d}
+              data-testid={`button-window-${d}`}
+              onClick={() => setDays(d)}
+              style={{
+                background: days === d ? "#fff" : "transparent",
+                border: "none",
+                borderRadius: 6,
+                padding: "5px 12px",
+                fontSize: 12,
+                fontWeight: 700,
+                color: days === d ? "#7c3aed" : "#64748b",
+                cursor: "pointer",
+                boxShadow: days === d ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              }}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+      <p style={{ margin: "0 0 16px", color: "#64748b", fontSize: 13 }}>
+        Daily breakdown of businesses that started, succeeded, or skipped the first-quote gate.
+      </p>
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 14, color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
+
+      {/* Totals */}
+      {data && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+          <Stat label="Started" value={data.businesses_started} color="#1e293b" testId="stat-started" />
+          <Stat label="Succeeded" value={data.succeeded} color="#16a34a" testId="stat-succeeded" />
+          <Stat label="Skipped" value={data.skipped} color="#d97706" testId="stat-skipped" />
+          <Stat label="Conversion" value={`${data.conversion_rate_pct}%`} color="#7c3aed" testId="stat-conversion" />
+          <Stat label="Retry Success" value={`${data.retry_success_rate_pct}%`} color="#0891b2" testId="stat-retry" />
+        </div>
+      )}
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 10, fontSize: 12, color: "#475569", flexWrap: "wrap" }}>
+        <LegendDot color="#1e293b" label="Started" />
+        <LegendDot color="#16a34a" label="Succeeded" />
+        <LegendDot color="#d97706" label="Skipped" />
+      </div>
+
+      {/* Bar chart */}
+      <div
+        data-testid="chart-onboarding-trend"
+        style={{
+          display: "flex", alignItems: "flex-end", gap: 6,
+          height: 160, padding: "0 4px", borderBottom: "1px solid #e2e8f0",
+          opacity: loading ? 0.5 : 1,
+        }}
+      >
+        {daily.length === 0 && !loading && (
+          <div style={{ flex: 1, textAlign: "center", color: "#94a3b8", fontSize: 13, alignSelf: "center" }}>
+            No data for this window.
+          </div>
+        )}
+        {daily.map((d) => (
+          <div key={d.day} title={`${d.day}\nStarted: ${d.started}\nSucceeded: ${d.succeeded}\nSkipped: ${d.skipped}`}
+            data-testid={`bar-day-${d.day}`}
+            style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1, height: "100%", minWidth: 4 }}
+          >
+            <Bar value={d.started} max={maxValue} color="#1e293b" />
+            <Bar value={d.succeeded} max={maxValue} color="#16a34a" />
+            <Bar value={d.skipped} max={maxValue} color="#d97706" />
+          </div>
+        ))}
+      </div>
+
+      {/* X-axis labels (first / mid / last) */}
+      {daily.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+          <span>{fmtShort(daily[0].day)}</span>
+          {daily.length >= 3 && <span>{fmtShort(daily[Math.floor(daily.length / 2)].day)}</span>}
+          <span>{fmtShort(daily[daily.length - 1].day)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Bar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div style={{ flex: 1, height: `${pct}%`, minHeight: value > 0 ? 2 : 0, background: color, borderRadius: "2px 2px 0 0" }} />
+  );
+}
+
+function Stat({ label, value, color, testId }: { label: string; value: number | string; color: string; testId: string }) {
+  return (
+    <div data-testid={testId} style={{ background: "#f8fafc", borderRadius: 8, padding: "10px 14px", minWidth: 90 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color, marginTop: 2 }}>{value}</div>
+    </div>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+      <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: color }} />
+      {label}
+    </span>
+  );
+}
+
+function fmtShort(day: string) {
+  const d = new Date(day + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}

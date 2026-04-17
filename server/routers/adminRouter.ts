@@ -345,6 +345,8 @@ const router = Router();
   router.get("/onboarding-funnel", async (req: Request, res: Response) => {
     if (!checkAdminKey(req, res)) return;
     try {
+      const requestedDays = parseInt(String(req.query.days ?? "7"), 10);
+      const days = [7, 14, 30].includes(requestedDays) ? requestedDays : 7;
       const result = await pool.query(`
         WITH per_business AS (
           SELECT
@@ -408,6 +410,54 @@ const router = Router();
         SELECT agg.*, retry_stats.retried_businesses, retry_stats.retried_then_succeeded
         FROM agg, retry_stats
       `);
+      const dailyResult = await pool.query(
+        `
+        WITH days AS (
+          SELECT generate_series(
+            (CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day')::date,
+            CURRENT_DATE,
+            INTERVAL '1 day'
+          )::date AS day
+        ),
+        per_day AS (
+          SELECT
+            DATE(created_at) AS day,
+            COUNT(DISTINCT business_id) FILTER (
+              WHERE event_name = 'onboarding_gate_started'
+            )::int AS started,
+            COUNT(DISTINCT business_id) FILTER (
+              WHERE event_name = 'onboarding_gate_quote_generated'
+            )::int AS succeeded,
+            COUNT(DISTINCT business_id) FILTER (
+              WHERE event_name = 'onboarding_gate_option_selected'
+                AND properties->>'option' = 'skipped_after_error'
+            )::int AS skipped
+          FROM analytics_events
+          WHERE event_name IN (
+              'onboarding_gate_started',
+              'onboarding_gate_option_selected',
+              'onboarding_gate_quote_generated'
+            )
+            AND created_at >= CURRENT_DATE - ($1::int - 1) * INTERVAL '1 day'
+          GROUP BY DATE(created_at)
+        )
+        SELECT
+          to_char(d.day, 'YYYY-MM-DD') AS day,
+          COALESCE(p.started, 0)::int AS started,
+          COALESCE(p.succeeded, 0)::int AS succeeded,
+          COALESCE(p.skipped, 0)::int AS skipped
+        FROM days d
+        LEFT JOIN per_day p ON p.day = d.day
+        ORDER BY d.day ASC
+        `,
+        [days]
+      );
+      const daily = dailyResult.rows.map((r) => ({
+        day: r.day,
+        started: Number(r.started ?? 0),
+        succeeded: Number(r.succeeded ?? 0),
+        skipped: Number(r.skipped ?? 0),
+      }));
       const row = result.rows[0] ?? {};
       const started = Number(row.businesses_started ?? 0);
       const succeeded = Number(row.succeeded ?? 0);
@@ -429,6 +479,8 @@ const router = Router();
         retry_success_rate_pct: retriedBusinesses > 0
           ? Math.round((retriedThenSucceeded / retriedBusinesses) * 100)
           : 0,
+        window_days: days,
+        daily,
       });
     } catch (err: any) {
       console.error("GET /api/admin/onboarding-funnel error:", err.message);
