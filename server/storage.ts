@@ -459,6 +459,7 @@ export async function createQuote(data: {
   addOns: any;
   frequencySelected: string;
   selectedOption: string;
+  recommendedOption?: string;
   options: any;
   subtotal: number;
   tax: number;
@@ -480,6 +481,7 @@ export async function createQuote(data: {
       addOns: data.addOns,
       frequencySelected: data.frequencySelected,
       selectedOption: data.selectedOption,
+      ...(data.recommendedOption ? { recommendedOption: data.recommendedOption } : {}),
       options: data.options,
       subtotal: data.subtotal,
       tax: data.tax,

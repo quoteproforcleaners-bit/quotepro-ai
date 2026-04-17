@@ -1220,76 +1220,164 @@ const onboardingSendLimiter = rateLimit({
       const sqft = propertyDetails.sqft;
       
       const options = (quote.options as any) || {};
+      const DEFAULT_INCLUDED: Record<string, string[]> = {
+        good: [
+          "Kitchen surfaces, sink, and stovetop",
+          "All bathrooms scrubbed and sanitized",
+          "Floors vacuumed and mopped",
+          "Dusting of accessible surfaces",
+          "Trash emptied and replaced",
+        ],
+        better: [
+          "Everything in Good, plus:",
+          "Baseboards wiped down",
+          "Interior windows and sills",
+          "Appliance exteriors detailed",
+          "Ceiling fans and light fixtures dusted",
+        ],
+        best: [
+          "Everything in Better, plus:",
+          "Inside oven and microwave",
+          "Inside refrigerator",
+          "Cabinet fronts hand-wiped",
+          "Light organization and tidy-up",
+        ],
+      };
       const optionsArray = (["good", "better", "best"] as const)
         .filter(k => options[k] !== undefined)
-        .map(k => ({
-          key: k as string,
-          label: k.charAt(0).toUpperCase() + k.slice(1),
-          name: options[k]?.name || options[k]?.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1)),
-          scope: options[k]?.scope || '',
-          price: Number(options[k]?.price || 0),
-        }));
+        .map(k => {
+          const includedFromAddons: string[] = Array.isArray(options[k]?.addOnsIncluded) ? options[k].addOnsIncluded : [];
+          const baseIncluded = DEFAULT_INCLUDED[k] || [];
+          const merged = baseIncluded.concat(
+            includedFromAddons.filter((a: string) => !baseIncluded.some(b => b.toLowerCase().includes(a.toLowerCase())))
+          );
+          return {
+            key: k as string,
+            label: k.charAt(0).toUpperCase() + k.slice(1),
+            name: options[k]?.name || options[k]?.serviceTypeName || (k.charAt(0).toUpperCase() + k.slice(1)),
+            scope: options[k]?.scope || '',
+            price: Number(options[k]?.price || 0),
+            included: merged,
+          };
+        });
 
-      const propertyInfoHtml = (beds || baths || sqft) ? `
-      <tr><td align="center" style="padding:24px 20px;background-color:#ffffff;border-bottom:1px solid #eeeeee;">
-        <table width="100%" cellpadding="0" cellspacing="0" align="center">
-          <tr>
-            ${beds ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${beds}</div><div style="color:#666666;font-size:12px;">Beds</div></td>` : ''}
-            ${baths ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${baths}</div><div style="color:#666666;font-size:12px;">Baths</div></td>` : ''}
-            ${sqft ? `<td align="center" style="padding:0 16px;font-size:14px;"><div style="font-weight:600;color:#333333;">${sqft}</div><div style="color:#666666;font-size:12px;">Sq Ft</div></td>` : ''}
-          </tr>
-        </table>
-      </td></tr>` : '';
+      // Brand tokens
+      const BRAND_GREEN = '#0F6E56';
+      const BRAND_GOLD = '#C9920A';
+      const TEXT_DARK = '#1A1A1A';
+      const TEXT_MUTED = '#5A6B6E';
+      const CARD_BG_MUTED = '#F5F7F6';
+      const PAGE_BG = '#F5F5F5';
+      const BORDER_LIGHT = '#E5E9E8';
+      const FONT_STACK = `'Plus Jakarta Sans','Inter','Helvetica Neue',Arial,Helvetica,sans-serif`;
 
-      const savedRecommended = (quote as any).recommendedOption || 'better';
-      const optionsCardsHtml = optionsArray.map((option) => {
+      const propertySummary = [
+        beds ? `${beds} Bed` : '',
+        baths ? `${baths} Bath` : '',
+        sqft ? `${sqft} Sq Ft` : '',
+      ].filter(Boolean).join(' &middot; ');
+
+      const savedRecommended = (quote as any).recommendedOption || 'best';
+      const esc = (v: any) => String(v ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      const buildBullets = (items: string[]) => items.map(it => `
+                <tr><td valign="top" style="padding:6px 0;font-family:${FONT_STACK};font-size:14px;line-height:1.45;color:${TEXT_DARK};">
+                  <table cellpadding="0" cellspacing="0" border="0"><tr>
+                    <td valign="top" width="18" style="padding-top:4px;color:${BRAND_GREEN};font-weight:700;">&#10003;</td>
+                    <td valign="top" style="padding-left:6px;color:${TEXT_DARK};">${esc(it)}</td>
+                  </tr></table>
+                </td></tr>`).join('');
+
+      const buildCardCell = (option: typeof optionsArray[number]) => {
         const isRecommended = option.key === savedRecommended;
-        const borderColor = isRecommended ? primaryColor : '#eeeeee';
-        const backgroundColor = isRecommended ? '#f9f9ff' : '#ffffff';
-        const badgeHtml = isRecommended ? `<div style="display:inline-block;background:${primaryColor};color:white;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:12px;">RECOMMENDED</div><br/>` : '';
+        const borderColor = isRecommended ? BRAND_GREEN : BORDER_LIGHT;
+        const cardBg = isRecommended ? '#FFFFFF' : CARD_BG_MUTED;
+        const ctaBg = isRecommended ? BRAND_GREEN : '#FFFFFF';
+        const ctaColor = isRecommended ? '#FFFFFF' : BRAND_GREEN;
+        const ctaBorder = isRecommended ? BRAND_GREEN : BRAND_GREEN;
+        const recommendedBadge = isRecommended
+          ? `<div style="display:inline-block;background:${BRAND_GOLD};color:#FFFFFF;padding:4px 12px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;margin-bottom:14px;font-family:${FONT_STACK};">&#9733; Recommended</div>`
+          : '';
         return `
-      <tr><td style="padding:16px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid ${borderColor};border-radius:8px;background-color:${backgroundColor};">
-          <tr><td style="padding:20px;">
-            ${badgeHtml}
-            <div style="font-size:18px;font-weight:700;color:#333333;margin-bottom:4px;">${option.name}</div>
-            ${option.scope ? `<div style="font-size:14px;color:#666666;margin-bottom:16px;line-height:1.4;">${option.scope}</div>` : ''}
-            <div style="font-size:28px;font-weight:700;color:${primaryColor};margin-bottom:20px;">$${option.price.toFixed(2)}</div>
-            <a href="${quoteUrl}?option=${option.key}" style="display:block;background:${primaryColor};color:white;padding:14px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;text-align:center;">Accept ${option.name}</a>
-          </td></tr>
-        </table>
-      </td></tr>`;
-      }).join('');
+        <td valign="top" align="center" class="tier-cell" style="padding:8px;width:33.33%;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" class="tier-card" style="background:${cardBg};border:2px solid ${borderColor};border-radius:12px;${isRecommended ? `box-shadow:0 4px 14px rgba(15,110,86,0.18);` : ''}">
+            <tr><td style="padding:24px 20px 8px;text-align:center;font-family:${FONT_STACK};">
+              ${recommendedBadge}
+              <div style="font-size:13px;font-weight:700;color:${TEXT_MUTED};text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">${esc(option.label)}</div>
+              <div style="font-size:18px;font-weight:700;color:${TEXT_DARK};margin-bottom:14px;">${esc(option.name)}</div>
+              <div style="font-size:34px;line-height:1;font-weight:800;color:${BRAND_GREEN};margin-bottom:4px;letter-spacing:-0.5px;">$${option.price.toFixed(0)}</div>
+              <div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:18px;">one-time</div>
+            </td></tr>
+            <tr><td style="padding:0 22px 8px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                ${buildBullets(option.included)}
+              </table>
+            </td></tr>
+            <tr><td style="padding:18px 20px 22px;" align="center">
+              <a href="${quoteUrl}?option=${option.key}" style="display:inline-block;width:100%;box-sizing:border-box;background:${ctaBg};color:${ctaColor};border:2px solid ${ctaBorder};padding:13px 16px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;text-align:center;font-family:${FONT_STACK};">Select ${option.label}</a>
+            </td></tr>
+          </table>
+        </td>`;
+      };
 
-      const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+      const cardCells = optionsArray.map(buildCardCell).join('');
+
+      const emailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Quote Options</title>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .tier-row { display:block !important; width:100% !important; }
+      .tier-cell { display:block !important; width:100% !important; padding:8px 0 !important; }
+      .container { width:100% !important; padding:0 12px !important; }
+      h1.email-h1 { font-size:22px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:${PAGE_BG};font-family:${FONT_STACK};-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${PAGE_BG};padding:24px 0;">
     <tr><td align="center">
-      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background-color:#ffffff;">
-        <tr><td style="padding:32px 20px;text-align:center;border-bottom:1px solid #eeeeee;">
-          ${business.logoUri ? `<div style="margin-bottom:16px;"><img src="${business.logoUri}" alt="${business.companyName}" style="max-height:50px;max-width:200px;"></div>` : ''}
-          <h1 style="margin:0;font-size:24px;font-weight:700;color:#333333;">Your Quote Options</h1>
-          <p style="margin:8px 0 0;font-size:14px;color:#666666;">Hi ${customerName}, please select the option that works best for you.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="container" style="max-width:680px;">
+
+        <tr><td style="padding:8px 12px 20px;text-align:center;font-family:${FONT_STACK};">
+          ${business.logoUri ? `<img src="${esc(business.logoUri)}" alt="${esc(business.companyName || 'QuotePro')}" style="max-height:42px;max-width:180px;display:inline-block;">` : `<div style="font-size:18px;font-weight:800;color:${TEXT_DARK};">${esc(business.companyName || 'QuotePro')}</div>`}
         </td></tr>
-        ${propertyInfoHtml}
-        <tr><td style="padding:24px 0;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;">
-            ${optionsCardsHtml}
+
+        <tr><td style="background:#FFFFFF;border-radius:14px;border:1px solid ${BORDER_LIGHT};padding:32px 24px 12px;text-align:center;font-family:${FONT_STACK};">
+          <h1 class="email-h1" style="margin:0 0 8px;font-size:26px;font-weight:800;color:${TEXT_DARK};letter-spacing:-0.4px;">Your Quote Options</h1>
+          <p style="margin:0 0 6px;font-size:15px;color:${TEXT_DARK};">Hi ${esc(customerName)},</p>
+          <p style="margin:0 0 14px;font-size:14px;color:${TEXT_MUTED};line-height:1.5;">Based on your home details, here are your cleaning options. Pick the one that fits best.</p>
+          ${propertySummary ? `<div style="display:inline-block;background:${CARD_BG_MUTED};border:1px solid ${BORDER_LIGHT};border-radius:999px;padding:8px 16px;font-size:13px;color:${TEXT_DARK};font-weight:600;">${propertySummary}</div>` : ''}
+        </td></tr>
+
+        <tr><td style="padding:18px 0 6px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tier-row">
+            <tr>
+              ${cardCells}
+            </tr>
           </table>
         </td></tr>
-        <tr><td style="padding:20px;text-align:center;background-color:#f9f9f9;border-top:1px solid #eeeeee;">
-          <p style="margin:0;font-size:12px;color:#666666;line-height:1.5;">
-            If buttons don't work, reply with <strong>1</strong> (Good), <strong>2</strong> (Better), or <strong>3</strong> (Best) to select your option.
+
+        <tr><td style="padding:8px 16px 6px;text-align:center;font-family:${FONT_STACK};">
+          <p style="margin:0;font-size:12px;color:${TEXT_MUTED};line-height:1.6;">
+            If buttons don't work, reply with <strong style="color:${TEXT_DARK};">1</strong> (Good), <strong style="color:${TEXT_DARK};">2</strong> (Better), or <strong style="color:${TEXT_DARK};">3</strong> (Best) to select your option.
           </p>
         </td></tr>
-        <tr><td style="padding:24px 20px;text-align:center;border-top:1px solid #eeeeee;background-color:#ffffff;">
-          <div style="font-weight:600;color:#333333;margin-bottom:8px;">${business.companyName || 'QuotePro'}</div>
-          ${business.phone ? `<div style="font-size:13px;color:#666666;margin-bottom:4px;">Phone: <a href="tel:${business.phone}" style="color:${primaryColor};text-decoration:none;">${business.phone}</a></div>` : ''}
-          ${replyToEmail ? `<div style="font-size:13px;color:#666666;">Email: <a href="mailto:${replyToEmail}" style="color:${primaryColor};text-decoration:none;">${replyToEmail}</a></div>` : ''}
+
+        <tr><td style="padding:24px 16px 8px;text-align:center;font-family:${FONT_STACK};">
+          <div style="font-weight:700;color:${TEXT_DARK};margin-bottom:6px;font-size:14px;">${esc(business.companyName || 'QuotePro')}</div>
+          ${business.phone ? `<div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:3px;">Phone: <a href="tel:${esc(business.phone)}" style="color:${BRAND_GREEN};text-decoration:none;">${esc(business.phone)}</a></div>` : ''}
+          ${replyToEmail ? `<div style="font-size:12px;color:${TEXT_MUTED};margin-bottom:10px;">Email: <a href="mailto:${esc(replyToEmail)}" style="color:${BRAND_GREEN};text-decoration:none;">${esc(replyToEmail)}</a></div>` : ''}
+          <div style="font-size:11px;color:${TEXT_MUTED};margin-top:12px;">Powered by <span style="color:${BRAND_GREEN};font-weight:700;">QuotePro</span></div>
         </td></tr>
+
       </table>
     </td></tr>
   </table>
