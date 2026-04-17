@@ -6,6 +6,7 @@ import { apiPost, apiDelete } from "../../lib/api";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
 import AddressAutocompleteLine from "../../components/AddressAutocompleteLine";
 import { Toast } from "../../components/ui";
+import { LeadQuoteIcon, OwnHomeIcon } from "../../components/onboarding/OnboardingIcons";
 
 const BRAND_GREEN = "#0F6E56";
 const BRAND_GREEN_DARK = "#0B5443";
@@ -103,59 +104,6 @@ function AddressForm({
         </button>
       )}
     </form>
-  );
-}
-
-// ── Custom illustrations ──────────────────────────────────────────────────
-function LeadIllustration() {
-  return (
-    <svg width={64} height={64} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="leadGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#E6F5EF" />
-          <stop offset="100%" stopColor="#D1EDE2" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#leadGrad)" />
-      {/* Document */}
-      <rect x="16" y="14" width="28" height="36" rx="3" fill="#fff" stroke={BRAND_GREEN} strokeWidth="1.6" />
-      <line x1="20" y1="22" x2="36" y2="22" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.5" />
-      <line x1="20" y1="28" x2="40" y2="28" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
-      <line x1="20" y1="34" x2="34" y2="34" stroke={BRAND_GREEN} strokeWidth="1.6" strokeLinecap="round" opacity="0.35" />
-      {/* Check badge */}
-      <circle cx="46" cy="46" r="10" fill={BRAND_GREEN} />
-      <path d="M42 46l3 3 5-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
-function HomeIllustration() {
-  return (
-    <svg width={64} height={64} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="homeGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#E6F5EF" />
-          <stop offset="100%" stopColor="#C7E8DA" />
-        </linearGradient>
-        <linearGradient id="roofGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={BRAND_GREEN} />
-          <stop offset="100%" stopColor={BRAND_GREEN_DARK} />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#homeGrad)" />
-      {/* House body */}
-      <rect x="16" y="30" width="32" height="22" rx="2" fill="#fff" stroke={BRAND_GREEN} strokeWidth="1.6" />
-      {/* Roof */}
-      <path d="M12 32 L32 14 L52 32 Z" fill="url(#roofGrad)" stroke={BRAND_GREEN_DARK} strokeWidth="1.4" strokeLinejoin="round" />
-      {/* Door */}
-      <rect x="28" y="38" width="8" height="14" rx="1" fill={BRAND_GREEN} opacity="0.85" />
-      <circle cx="34" cy="45" r="0.8" fill={BRAND_GOLD} />
-      {/* Windows */}
-      <rect x="19" y="36" width="6" height="6" rx="0.8" fill="#E6F5EF" stroke={BRAND_GREEN} strokeWidth="1" />
-      <rect x="39" y="36" width="6" height="6" rx="0.8" fill="#E6F5EF" stroke={BRAND_GREEN} strokeWidth="1" />
-      {/* Sparkle */}
-      <path d="M50 18l1.2 2.6 2.6 1.2-2.6 1.2L50 25.6l-1.2-2.6L46.2 22l2.6-1.2z" fill={BRAND_GOLD} opacity="0.9" />
-    </svg>
   );
 }
 
@@ -354,7 +302,7 @@ export default function FirstQuotePage() {
                 style={styles.card}
                 aria-label="Quote a real lead"
               >
-                <div style={styles.cardIcon}><LeadIllustration /></div>
+                <div style={styles.cardIcon}><LeadQuoteIcon size={72} /></div>
                 <h3 style={styles.cardTitle}>Quote a real lead</h3>
                 <p style={styles.cardDesc}>
                   Enter a lead's details and generate a real quote you can send right now.
@@ -376,7 +324,7 @@ export default function FirstQuotePage() {
                   </svg>
                   Recommended
                 </span>
-                <div style={styles.cardIcon}><HomeIllustration /></div>
+                <div style={styles.cardIcon}><OwnHomeIcon size={72} /></div>
                 <h3 style={styles.cardTitle}>Quote your own home</h3>
                 <p style={styles.cardDesc}>
                   See QuotePro in action using your own address. Your quote will be emailed to you.
