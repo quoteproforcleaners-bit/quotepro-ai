@@ -84,6 +84,34 @@ import { pendingAuthTokens, generateAuthToken } from "../clients";
 
 const router = Router();
 
+// Extracts marketing attribution (where a signup came from) from a request.
+// Looks at the JSON body first, then the query string. Accepts either snake_case
+// (utm_source/utm_campaign — the marketing standard) or camelCase
+// (signupSource/signupCampaign — what our own clients send).
+function extractSignupAttribution(req: Request): {
+  signupSource: string | null;
+  signupCampaign: string | null;
+} {
+  const pick = (key: string): string | null => {
+    const fromBody = (req.body && (req.body as any)[key]) as unknown;
+    const fromQuery = (req.query && (req.query as any)[key]) as unknown;
+    const v = (typeof fromBody === "string" && fromBody) || (typeof fromQuery === "string" && fromQuery) || "";
+    const trimmed = String(v || "").trim().slice(0, 120);
+    return trimmed ? trimmed : null;
+  };
+  const source =
+    pick("signupSource") ||
+    pick("signup_source") ||
+    pick("utm_source") ||
+    pick("source");
+  const campaign =
+    pick("signupCampaign") ||
+    pick("signup_campaign") ||
+    pick("utm_campaign") ||
+    pick("campaign");
+  return { signupSource: source, signupCampaign: campaign };
+}
+
   router.post("/crash-report", async (req: Request, res: Response) => {
     try {
       const { error, stack, componentStack, source } = req.body;
@@ -151,16 +179,19 @@ const router = Router();
       const signupIp = req.ip || null;
       // firstName takes precedence; fall back to legacy name param if present
       const resolvedName = (firstName as string | undefined)?.trim() || (name as string | undefined)?.trim() || null;
+      const { signupSource, signupCampaign } = extractSignupAttribution(req);
       const user = await createUser({
         email,
-        name: resolvedName,
+        name: resolvedName ?? undefined,
         passwordHash,
         authProvider: "email",
         referralCode,
         referredBy,
         trialStartedAt: new Date(),
         signupIp,
-      } as any);
+        signupSource: signupSource || (referredBy ? "referral" : null),
+        signupCampaign,
+      });
 
       // Save first_name to dedicated column for personalization
       const firstNameVal = (firstName as string | undefined)?.trim() || null;
@@ -172,7 +203,11 @@ const router = Router();
       enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
       sendWelcomeEmail(email, user.name);
       sendSignupNotification(email, user.name, "email");
-      trackEvent(user.id, AnalyticsEvents.ACCOUNT_CREATED, { authProvider: "email" }).catch(() => {});
+      trackEvent(user.id, AnalyticsEvents.ACCOUNT_CREATED, {
+        authProvider: "email",
+        signupSource: signupSource || (referredBy ? "referral" : null),
+        signupCampaign,
+      }).catch(() => {});
       trackEvent(user.id, AnalyticsEvents.TRIAL_STARTED, { plan: "free" }).catch(() => {});
 
       await new Promise<void>((resolve, reject) => {
@@ -262,6 +297,13 @@ const router = Router();
       const redirectUri = `${baseUrl}/api/auth/apple/callback`;
       const state = crypto.randomBytes(32).toString("hex");
       req.session.appleOAuthState = state;
+      const { signupSource: aStartSrc, signupCampaign: aStartCmp } = extractSignupAttribution(req);
+      if (aStartSrc || aStartCmp) {
+        (req.session as any).pendingSignupAttribution = {
+          source: aStartSrc,
+          campaign: aStartCmp,
+        };
+      }
       await new Promise<void>((resolve) => req.session.save(() => resolve()));
       const url = `https://appleid.apple.com/auth/authorize?` +
         `client_id=${encodeURIComponent(clientId)}` +
@@ -338,7 +380,19 @@ const router = Router();
         if (user) {
           return res.redirect("/app/login?error=account_exists");
         }
-        user = await createUser({ email, name, authProvider: "apple", providerId });
+        const pendingAttrApple = ((req.session as any).pendingSignupAttribution ?? {}) as {
+          source?: string | null;
+          campaign?: string | null;
+        };
+        delete (req.session as any).pendingSignupAttribution;
+        user = await createUser({
+          email,
+          name,
+          authProvider: "apple",
+          providerId,
+          signupSource: pendingAttrApple.source ?? null,
+          signupCampaign: pendingAttrApple.campaign ?? null,
+        });
         await createBusiness(user.id);
         const isRelayEmail = email.endsWith("@privaterelay.appleid.com");
         if (isRelayEmail) {
@@ -416,11 +470,14 @@ const router = Router();
             ? `${fullName.givenName} ${fullName.familyName}`
             : undefined;
 
+        const { signupSource: appleSrc, signupCampaign: appleCmp } = extractSignupAttribution(req);
         user = await createUser({
           email,
           name,
           authProvider: "apple",
           providerId,
+          signupSource: appleSrc,
+          signupCampaign: appleCmp,
         });
 
         const business = await createBusiness(user.id);
@@ -517,11 +574,14 @@ const router = Router();
           });
         }
 
+        const { signupSource: gSrc, signupCampaign: gCmp } = extractSignupAttribution(req);
         user = await createUser({
           email,
           name,
           authProvider: "google",
           providerId,
+          signupSource: gSrc,
+          signupCampaign: gCmp,
         });
 
         const business = await createBusiness(user.id);
@@ -605,6 +665,16 @@ const router = Router();
       const _startState = (_startIntent && ["starter", "growth", "pro"].includes(_startIntent))
         ? `${platform}:${_startIntent}`
         : platform;
+      // Stash signup attribution in the session so the OAuth callback can
+      // record it on the new user (Google won't echo arbitrary params back).
+      const { signupSource: gStartSrc, signupCampaign: gStartCmp } = extractSignupAttribution(req);
+      if (gStartSrc || gStartCmp) {
+        (req.session as any).pendingSignupAttribution = {
+          source: gStartSrc,
+          campaign: gStartCmp,
+        };
+        await new Promise<void>((resolve) => req.session.save(() => resolve()));
+      }
       const url = oauth2Client.generateAuthUrl({
         access_type: "offline",
         scope: ["openid", "email", "profile"],
@@ -670,7 +740,19 @@ const router = Router();
 h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
 </head><body><div class="card"><h2>Account Exists</h2><p>An account with this email already exists. Please sign in with your original method.</p></div></body></html>`);
         }
-        user = await createUser({ email, name, authProvider: "google", providerId });
+        const pendingAttr = ((req.session as any).pendingSignupAttribution ?? {}) as {
+          source?: string | null;
+          campaign?: string | null;
+        };
+        delete (req.session as any).pendingSignupAttribution;
+        user = await createUser({
+          email,
+          name,
+          authProvider: "google",
+          providerId,
+          signupSource: pendingAttr.source ?? null,
+          signupCampaign: pendingAttr.campaign ?? null,
+        });
         await createBusiness(user.id);
         enrollUserInDrip(user.id, email, user.name).catch((e) => console.error("[drip] enroll failed:", e.message));
         sendWelcomeEmail(email, user.name);

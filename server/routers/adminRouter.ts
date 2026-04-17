@@ -480,7 +480,14 @@ const router = Router();
       if (groupBy) {
         const keyExpr = groupBy === "tier"
           ? `COALESCE(u.subscription_tier, 'unknown')`
-          : `COALESCE(u.auth_provider, 'unknown')`;
+          // For source, prefer the captured marketing channel. Fall back to
+          // 'referral' when only a referrer code is present, then to 'direct'
+          // for any remaining new users so the breakdown is never empty.
+          : `COALESCE(
+              NULLIF(u.signup_source, ''),
+              CASE WHEN u.referred_by IS NOT NULL THEN 'referral' END,
+              'direct'
+            )`;
         const breakdownResult = await pool.query(`
           WITH ev AS (
             SELECT ae.business_id, ae.event_name, ae.properties, ${keyExpr} AS group_key

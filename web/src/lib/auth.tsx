@@ -57,6 +57,9 @@ interface RegisterData {
   lastName?: string;
   companyName?: string;
   intent?: string;
+  ref?: string;
+  signupSource?: string;
+  signupCampaign?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

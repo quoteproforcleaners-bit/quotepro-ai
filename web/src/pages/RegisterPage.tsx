@@ -1,7 +1,42 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { Zap, AlertCircle, Check } from "lucide-react";
+
+// Marketing-attribution helpers: figure out where the new user came from so
+// we can answer "which channel converts best?" later. We look at the URL
+// (?utm_source=..., ?ref=..., ?source=...) first, then fall back to whatever
+// the LandingPage stashed in sessionStorage when the visitor first arrived.
+const ATTRIBUTION_STORAGE_KEY = "qp_signup_attribution";
+
+type Attribution = { signupSource: string | null; signupCampaign: string | null };
+
+function readStoredAttribution(): Attribution {
+  try {
+    const raw = sessionStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+    if (!raw) return { signupSource: null, signupCampaign: null };
+    const parsed = JSON.parse(raw);
+    return {
+      signupSource: typeof parsed?.signupSource === "string" ? parsed.signupSource : null,
+      signupCampaign: typeof parsed?.signupCampaign === "string" ? parsed.signupCampaign : null,
+    };
+  } catch {
+    return { signupSource: null, signupCampaign: null };
+  }
+}
+
+function resolveAttribution(searchParams: URLSearchParams): Attribution {
+  const fromUrl = (k: string) => (searchParams.get(k) || "").trim() || null;
+  const stored = readStoredAttribution();
+  return {
+    signupSource:
+      fromUrl("utm_source") ||
+      fromUrl("source") ||
+      (fromUrl("ref") ? "referral" : null) ||
+      stored.signupSource,
+    signupCampaign: fromUrl("utm_campaign") || fromUrl("campaign") || stored.signupCampaign,
+  };
+}
 
 const GOOGLE_SVG = (
   <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
@@ -24,6 +59,8 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const intent = searchParams.get("intent") || "";
+  const ref = searchParams.get("ref") || "";
+  const attribution = useMemo<Attribution>(() => resolveAttribution(searchParams), [searchParams]);
   const [form, setForm] = useState({
     firstName: "",
     email: "",
@@ -32,6 +69,18 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // If the user arrived directly with attribution params, persist them so a
+  // detour through Google OAuth still preserves the original source.
+  useEffect(() => {
+    if (attribution.signupSource || attribution.signupCampaign) {
+      try {
+        sessionStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
+      } catch {
+        /* sessionStorage may be unavailable (private mode); attribution still flows via the request body */
+      }
+    }
+  }, [attribution]);
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -45,7 +94,14 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register({ ...form, ...(intent ? { intent } : {}) });
+      await register({
+        ...form,
+        ...(intent ? { intent } : {}),
+        ...(ref ? { ref } : {}),
+        ...(attribution.signupSource ? { signupSource: attribution.signupSource } : {}),
+        ...(attribution.signupCampaign ? { signupCampaign: attribution.signupCampaign } : {}),
+      });
+      try { sessionStorage.removeItem(ATTRIBUTION_STORAGE_KEY); } catch { /* noop */ }
       navigate("/dashboard");
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
@@ -59,7 +115,16 @@ export default function RegisterPage() {
     setGoogleLoading(true);
     try {
       const intentParam = intent ? `&intent=${encodeURIComponent(intent)}` : "";
-      const res = await fetch(`/api/auth/google/start?platform=web${intentParam}`, { credentials: "include" });
+      const sourceParam = attribution.signupSource
+        ? `&signupSource=${encodeURIComponent(attribution.signupSource)}`
+        : "";
+      const campaignParam = attribution.signupCampaign
+        ? `&signupCampaign=${encodeURIComponent(attribution.signupCampaign)}`
+        : "";
+      const res = await fetch(
+        `/api/auth/google/start?platform=web${intentParam}${sourceParam}${campaignParam}`,
+        { credentials: "include" }
+      );
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;

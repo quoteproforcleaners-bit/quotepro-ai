@@ -43,6 +43,8 @@ export const users = pgTable("users", {
   referralCreditsMonths: integer("referral_credits_months").default(0),
   referralFraudFlagged: boolean("referral_fraud_flagged").default(false),
   signupIp: text("signup_ip"),
+  signupSource: text("signup_source"),
+  signupCampaign: text("signup_campaign"),
   // Badge rewards
   proposalTemplatesUnlocked: boolean("proposal_templates_unlocked").default(false),
   growthPreviewUntil: timestamp("growth_preview_until"),

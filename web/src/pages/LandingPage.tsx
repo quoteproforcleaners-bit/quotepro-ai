@@ -1,5 +1,42 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+// When the marketing site loads, capture any UTM parameters in the URL so the
+// signup form can credit the right channel even after the visitor clicks
+// around or detours through Google OAuth. If they arrived without UTMs, we
+// still tag them as "landing" so the onboarding funnel can distinguish
+// landing-page traffic from referral links and direct registrations.
+const ATTRIBUTION_STORAGE_KEY = "qp_signup_attribution";
+function captureLandingAttribution() {
+  if (typeof window === "undefined") return;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const get = (k: string) => (params.get(k) || "").trim();
+    const utmSource = get("utm_source");
+    const utmCampaign = get("utm_campaign");
+    const ref = get("ref");
+    const explicitSource = get("source");
+    const signupSource =
+      utmSource ||
+      explicitSource ||
+      (ref ? "referral" : "") ||
+      "landing";
+    const attribution = {
+      signupSource,
+      signupCampaign: utmCampaign || get("campaign") || null,
+    };
+    // Don't overwrite a stronger UTM-tagged attribution with a plain "landing"
+    // value if the visitor previously arrived from a campaign.
+    const existingRaw = sessionStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+    if (existingRaw && signupSource === "landing") {
+      const existing = JSON.parse(existingRaw);
+      if (existing && existing.signupSource && existing.signupSource !== "landing") return;
+    }
+    sessionStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(attribution));
+  } catch {
+    /* sessionStorage unavailable (private mode) — skip silently */
+  }
+}
 import {
   Zap,
   ArrowRight,
@@ -345,6 +382,9 @@ const INCLUDED = [
 ];
 
 export default function LandingPage() {
+  useEffect(() => {
+    captureLandingAttribution();
+  }, []);
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}

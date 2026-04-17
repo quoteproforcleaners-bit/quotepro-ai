@@ -114,6 +114,9 @@ export async function createUser(data: {
   referralCode?: string | null;
   referredBy?: string | null;
   trialStartedAt?: Date | null;
+  signupIp?: string | null;
+  signupSource?: string | null;
+  signupCampaign?: string | null;
 }): Promise<User> {
   const [user] = await db
     .insert(users)
@@ -126,6 +129,9 @@ export async function createUser(data: {
       ...(data.referralCode ? { referralCode: data.referralCode } : {}),
       ...(data.referredBy ? { referredBy: data.referredBy } : {}),
       ...(data.trialStartedAt ? { trialStartedAt: data.trialStartedAt } : {}),
+      ...(data.signupIp ? { signupIp: data.signupIp } : {}),
+      ...(data.signupSource ? { signupSource: data.signupSource } : {}),
+      ...(data.signupCampaign ? { signupCampaign: data.signupCampaign } : {}),
     })
     .returning();
   return user;
