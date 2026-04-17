@@ -108,7 +108,14 @@ function AddressForm({
           onClick={onSkip}
           disabled={skipping}
         >
-          {skipping ? "Skipping..." : "Skip this step and go to the dashboard"}
+          {skipping ? (
+            <span style={styles.skipInner}>
+              <span style={styles.skipSpinner} aria-hidden="true" />
+              Skipping...
+            </span>
+          ) : (
+            "Skip this step and go to the dashboard"
+          )}
         </button>
       )}
     </form>
@@ -530,5 +537,21 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "4px 0",
     textAlign: "center" as const,
     width: "100%",
+  },
+  skipInner: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    textDecoration: "none",
+  },
+  skipSpinner: {
+    display: "inline-block",
+    width: 12,
+    height: 12,
+    border: "2px solid #CBD5E1",
+    borderTopColor: "#64748B",
+    borderRadius: "50%",
+    animation: "spin 0.7s linear infinite",
   },
 };
