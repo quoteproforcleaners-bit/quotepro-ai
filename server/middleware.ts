@@ -14,6 +14,7 @@ import type { Request, Response, NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import { pool } from "./db";
 import { getUserById } from "./storage";
+import { createPgRateLimitStore } from "./rateLimitStore";
 import {
   isGrowthOrAbove as _isGrowthOrAbove,
   isStarterOrAbove as _isStarterOrAbove,
@@ -113,6 +114,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many attempts. Try again later." },
+  store: createPgRateLimitStore(pool, "auth:"),
 });
 
 /** Strict login limiter: 5 failed attempts per 15 minutes per IP.
@@ -124,4 +126,5 @@ export const loginFailureLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true,
   message: { message: "Too many attempts. Try again later." },
+  store: createPgRateLimitStore(pool, "login-failure:"),
 });

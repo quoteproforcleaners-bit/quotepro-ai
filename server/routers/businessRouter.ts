@@ -6,6 +6,7 @@ import Stripe from "stripe";
 import rateLimit from "express-rate-limit";
 import { Router, type Request, type Response } from "express";
 import { pool, db } from "../db";
+import { createPgRateLimitStore } from "../rateLimitStore";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
@@ -2010,6 +2011,7 @@ const geocodeLimiter = rateLimit({
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
   message: { message: "Too many geocode requests. Try again later." },
+  store: createPgRateLimitStore(pool, "geocode:"),
 });
 
 router.get("/geocode/city-suggestions", requireAuth, geocodeLimiter, async (req: Request, res: Response) => {

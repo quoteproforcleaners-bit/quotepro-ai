@@ -5,6 +5,7 @@
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { Router, type Request, type Response } from "express";
+import { createPgRateLimitStore } from "../rateLimitStore";
 import { verifyUnsubscribeToken } from "../dripEmails";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
@@ -2262,6 +2263,7 @@ Return ONLY valid JSON — no markdown, no preamble:
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests — please try again later." },
+    store: createPgRateLimitStore(pool, "lead-link-config:"),
   });
 
   // ─── Pricing Configuration Checker ───────────────────────────────────────
@@ -2785,7 +2787,11 @@ router.post("/api/public/tip-page/:token/checkout", async (req: Request, res: Re
 
 // ─── Quote Request (Autopilot Booking Flow) ───────────────────────────────────
 
-const quoteRequestLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10 });
+const quoteRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  store: createPgRateLimitStore(pool, "quote-request:"),
+});
 
 router.post("/api/public/quote-request", quoteRequestLimiter, async (req: Request, res: Response) => {
   try {
@@ -3024,6 +3030,7 @@ const chatRateLimit = rateLimit({
   message: { error: "Too many messages. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createPgRateLimitStore(pool, "chat:"),
 });
 
 function buildPricingContext(settings: any): string {

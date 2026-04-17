@@ -5,6 +5,7 @@
 import { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import { pool, db } from "../db";
+import { createPgRateLimitStore } from "../rateLimitStore";
 import { eq, and, desc, asc, gte, lte, lt, gt, isNull, isNotNull, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireGrowth, requireStarter, requirePro, authLimiter, loginFailureLimiter, isGrowthOrAbove } from "../middleware";
 import { anthropic, getStripe, getPublicBaseUrl, getLangInstruction, getEffectiveLang, generateRevenuePlaybook, generateJobUpdatePageHtml } from "../clients";
@@ -880,6 +881,7 @@ const quoteEmailLimiter = rateLimit({
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
   message: { message: "Too many emails sent. Please wait before sending another." },
+  store: createPgRateLimitStore(pool, "quote-email:"),
 });
 
   router.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, quoteEmailLimiter, async (req: Request, res: Response) => {
