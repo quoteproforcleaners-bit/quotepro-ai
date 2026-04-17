@@ -113,7 +113,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      # Only web/dist is cached here. This repo has a single root
+      # package.json (no separate web/node_modules), and npm install
+      # caching is already handled by setup-node's `cache: npm`.
+      - name: Cache web build
+        id: cache-web-dist
+        uses: actions/cache@v4
+        with:
+          path: web/dist
+          key: web-dist-${{ runner.os }}-node20-${{ hashFiles('web/src/**', 'web/index.html', 'web/vite.config.ts', 'web/tsconfig.json', 'web/public/**', 'package-lock.json') }}
+
       - name: Build web app
+        if: steps.cache-web-dist.outputs.cache-hit != 'true'
         run: cd web && npx vite build
 
       - name: Push database schema
