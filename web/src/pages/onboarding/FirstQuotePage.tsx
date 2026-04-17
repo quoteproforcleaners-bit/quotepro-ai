@@ -140,18 +140,24 @@ export default function FirstQuotePage() {
     if (skipping) return;
     setSkipping(true);
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error", failureCount });
+    let skipFailed = false;
     try {
       await apiPost("/api/quotes/onboarding-skip", {});
       try { localStorage.removeItem("qp_pending_skip_retry"); } catch {}
     } catch (err) {
       console.error("[handleSkip] onboarding-skip API call failed:", err);
+      skipFailed = true;
+      // Set the retry flag BEFORE navigating so FirstQuoteGate sees it on the
+      // very first render of /dashboard and doesn't bounce the user back here.
       try { localStorage.setItem("qp_pending_skip_retry", "1"); } catch {}
-      setSkipWarning("Couldn't save your progress — you may see this screen again");
-      setSkipping(false);
-      return;
+      setSkipWarning("Couldn't save your progress — retrying in the background");
     }
-    await refresh();
+    // Always refresh + navigate. On failure the gate is bypassed via the
+    // qp_pending_skip_retry localStorage flag, and DashboardPage's silent
+    // retry effect will update the server flag in the background.
+    try { await refresh(); } catch {}
     navigate("/dashboard");
+    if (skipFailed) setSkipping(false);
   }
 
   const createQuoteMutation = useMutation({

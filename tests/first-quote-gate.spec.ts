@@ -246,6 +246,61 @@ test.describe("First-Quote Gate – skip link visibility by error type", () => {
       await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
     }
   );
+
+  test(
+    "Skip API failure: user still lands on /dashboard and stays there (gate bypassed)",
+    { timeout: 45000 },
+    async ({ page }) => {
+      const email = `pw-gate-skipfail-${Date.now()}@example.com`;
+      // Seed with has_completed_first_quote=false — do NOT pre-flip the flag
+      await seedGateUser(email);
+      await loginAs(page, email);
+      await page.goto(`${BASE_URL}/onboarding/first-quote`);
+
+      // Make /api/quotes return 500 so the skip link appears, AND make
+      // /api/quotes/onboarding-skip fail (simulating the skip API being down).
+      await mockQuoteCreateStatus(page, 500, "Simulated server error");
+      await page.route("**/api/quotes/onboarding-skip", async (route) => {
+        if (route.request().method() === "POST") {
+          await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Service unavailable" }),
+          });
+        } else {
+          await route.continue();
+        }
+      });
+
+      await openOwnHomeForm(page);
+      await page.getByRole("button", { name: /generate my quote/i }).click();
+      await expect(
+        page.getByRole("button", { name: /skip this step/i })
+      ).toBeVisible({ timeout: 8000 });
+
+      // Click skip — the underlying skip API will fail
+      await page.getByRole("button", { name: /skip this step/i }).click();
+
+      // User must reach /dashboard despite the skip API failure
+      await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+
+      // Wait and verify the gate did NOT bounce them back to onboarding
+      await page.waitForTimeout(2000);
+      expect(page.url()).toMatch(/\/dashboard/);
+      expect(page.url()).not.toMatch(/\/onboarding/);
+
+      // Server flag should still be false (skip API never succeeded);
+      // the bypass came from the localStorage retry flag, not the DB.
+      const flagged = await getHasCompletedFirstQuote(email);
+      expect(flagged).toBe(false);
+
+      // Confirm the silent retry flag was set so DashboardPage can retry later
+      const flag = await page.evaluate(() =>
+        window.localStorage.getItem("qp_pending_skip_retry")
+      );
+      expect(flag).toBe("1");
+    }
+  );
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
