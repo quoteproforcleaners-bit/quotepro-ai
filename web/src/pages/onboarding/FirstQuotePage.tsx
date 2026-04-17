@@ -19,6 +19,7 @@ function AddressForm({
   failureCount,
   isServerOrRateLimitError,
   onSkip,
+  skipping,
 }: {
   initialAddress: string;
   onSubmit: (data: { address: string; beds: number; baths: number; sqft: number }) => void;
@@ -27,6 +28,7 @@ function AddressForm({
   failureCount: number;
   isServerOrRateLimitError: boolean;
   onSkip: () => void;
+  skipping: boolean;
 }) {
   const [address, setAddress] = useState(initialAddress);
   const [beds, setBeds] = useState(3);
@@ -102,10 +104,11 @@ function AddressForm({
       {(failureCount >= 2 || (failureCount >= 1 && isServerOrRateLimitError)) && (
         <button
           type="button"
-          style={styles.skipLink}
+          style={{ ...styles.skipLink, ...(skipping ? { opacity: 0.6, cursor: "not-allowed" } : {}) }}
           onClick={onSkip}
+          disabled={skipping}
         >
-          Skip this step and go to the dashboard
+          {skipping ? "Skipping..." : "Skip this step and go to the dashboard"}
         </button>
       )}
     </form>
@@ -120,12 +123,15 @@ export default function FirstQuotePage() {
   const [failureCount, setFailureCount] = useState(0);
   const [isServerOrRateLimitError, setIsServerOrRateLimitError] = useState(false);
   const [skipWarning, setSkipWarning] = useState<string | null>(null);
+  const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_STARTED);
   }, []);
 
   async function handleSkip() {
+    if (skipping) return;
+    setSkipping(true);
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_OPTION_SELECTED, { option: "skipped_after_error" });
     try {
       await apiPost("/api/quotes/onboarding-skip", {});
@@ -134,6 +140,8 @@ export default function FirstQuotePage() {
       console.error("[handleSkip] onboarding-skip API call failed:", err);
       try { localStorage.setItem("qp_pending_skip_retry", "1"); } catch {}
       setSkipWarning("Couldn't save your progress — you may see this screen again");
+      setSkipping(false);
+      return;
     }
     await refresh();
     navigate("/dashboard");
@@ -316,6 +324,7 @@ export default function FirstQuotePage() {
               failureCount={failureCount}
               isServerOrRateLimitError={isServerOrRateLimitError}
               onSkip={handleSkip}
+              skipping={skipping}
             />
           </div>
         )}
