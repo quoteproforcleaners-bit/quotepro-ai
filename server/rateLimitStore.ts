@@ -49,6 +49,23 @@ function ensureTable(pool: Pool): Promise<void> {
 }
 
 /**
+ * Delete expired rows from the rate_limit_counters table.
+ *
+ * Expired rows are otherwise only overwritten when the same key is seen again,
+ * so without periodic pruning the table grows unbounded. Safe to call even if
+ * the table does not yet exist.
+ *
+ * @returns the number of rows deleted.
+ */
+export async function pruneExpiredRateLimitRows(pool: Pool): Promise<number> {
+  await ensureTable(pool);
+  const result = await pool.query(
+    `DELETE FROM rate_limit_counters WHERE expires_at <= NOW()`
+  );
+  return result.rowCount ?? 0;
+}
+
+/**
  * Returns an express-rate-limit Store backed by PostgreSQL.
  *
  * @param pool        - The `pg` Pool instance from server/db.ts.

@@ -633,6 +633,30 @@ async function seedToDoDemo() {
   // Analytics events TTL cleanup is scheduled via node-cron in server/routes.ts
   // (daily at 2am: "0 2 * * *") — no duplicate scheduler here.
 
+  // ─── Rate-limit counters cleanup: prune expired rows hourly ─────────────
+  // The rate_limit_counters table only overwrites a row when the same key is
+  // seen again, so stale rows accumulate forever without active pruning.
+  import("./rateLimitStore").then(({ pruneExpiredRateLimitRows }) => {
+    async function runRateLimitPrune() {
+      try {
+        const deleted = await pruneExpiredRateLimitRows(pool);
+        if (deleted > 0) {
+          console.log(`[rate-limit-prune] Deleted ${deleted} expired row(s)`);
+        }
+      } catch (e: any) {
+        console.error("[rate-limit-prune] Cleanup failed:", e.message);
+      }
+    }
+    // Run once at startup, then every hour (lock-guarded across instances).
+    async function lockedPrune() {
+      if (!await acquireLock("rate-limit-prune", 10)) return;
+      try { await runRateLimitPrune(); } finally { await releaseLock("rate-limit-prune"); }
+    }
+    lockedPrune();
+    setInterval(lockedPrune, 60 * 60 * 1000);
+    console.log("[rate-limit-prune] Cron scheduled (hourly)");
+  }).catch((e: any) => console.error("[rate-limit-prune] Failed to load store:", e.message));
+
   // ─── Auto-charge cron: runs every minute ─────────────────────────────────
   import("./cron/autoCharge").then(({ startAutoChargeCron }) => {
     startAutoChargeCron();
