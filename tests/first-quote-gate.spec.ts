@@ -250,6 +250,124 @@ test.describe("First-Quote Gate – skip link visibility by error type", () => {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+test.describe("First-Quote Gate – skip API failure still navigates to dashboard", () => {
+  const skipFailEmail = `pw-gate-skipfail-${Date.now()}@example.com`;
+
+  test.beforeAll(async () => {
+    // Seed the user with has_completed_first_quote=true so the FirstQuoteGate
+    // won't bounce them away from /dashboard. We're specifically testing that
+    // the FirstQuotePage's handleSkip()  *itself* surfaces the warning toast
+    // and still calls navigate("/dashboard") when the skip API returns 500 —
+    // we don't want the gate redirect to confound that assertion.
+    await seedGateUser(skipFailEmail);
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      await pool.query(
+        "UPDATE users SET has_completed_first_quote = true WHERE email = $1",
+        [skipFailEmail]
+      );
+    } finally {
+      await pool.end();
+    }
+  });
+
+  test(
+    "when POST /api/quotes/onboarding-skip returns 500, the warning toast appears and the user is still navigated to /dashboard",
+    { timeout: 30000 },
+    async ({ page }) => {
+      await loginAs(page, skipFailEmail);
+      await page.goto(`${BASE_URL}/onboarding/first-quote`);
+
+      await expect(
+        page.getByRole("heading", { name: /let.s send your first quote/i })
+      ).toBeVisible({ timeout: 8000 });
+
+      // Force quote creation to fail (500) so the skip link is revealed.
+      // Pattern **/api/quotes (exact) does NOT match the onboarding-skip subpath.
+      await page.route("**/api/quotes", async (route) => {
+        if (route.request().method() === "POST") {
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Simulated server error" }),
+          });
+        } else {
+          await route.continue();
+        }
+      });
+
+      // Force the skip API to return 500 — this is the behavior under test.
+      let skipApiCalled = false;
+      await page.route("**/api/quotes/onboarding-skip", async (route) => {
+        if (route.request().method() === "POST") {
+          skipApiCalled = true;
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Simulated skip server error" }),
+          });
+        } else {
+          await route.continue();
+        }
+      });
+
+      // Slow down the post-skip auth refresh so the toast has a window to be
+      // asserted before navigation unmounts the onboarding page.
+      await page.route("**/api/auth/me", async (route) => {
+        if (route.request().method() === "GET") {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+        await route.continue();
+      });
+
+      // Reveal the skip link by causing two quote-create failures.
+      await page.getByRole("button", { name: /try it on my home/i }).click();
+      const addressInput = page.getByPlaceholder(/start typing your address/i);
+      await expect(addressInput).toBeVisible({ timeout: 8000 });
+      await addressInput.click();
+      await addressInput.pressSequentially("100 Main Street, Denver, CO 80201", { delay: 10 });
+      await expect(addressInput).toHaveValue(/100 Main Street/);
+
+      // The autocomplete dropdown overlaps the submit button. Click any
+      // suggestion (matches the secondary "City, State, USA" line that only
+      // appears inside dropdown items) to commit the value and close the dropdown.
+      const anySuggestion = page.locator('text=/^[A-Za-z][A-Za-z .\'-]+,\\s*[A-Z]{2},\\s*USA$/').first();
+      try {
+        await anySuggestion.waitFor({ state: "visible", timeout: 3000 });
+        await anySuggestion.click();
+      } catch {
+        // Suggestions may not appear if Google Places isn't reachable; that's fine.
+      }
+
+      await page.getByRole("button", { name: /generate my quote/i }).click();
+      // 500 from /api/quotes shows the server-error message; the skip link
+      // is revealed immediately after a single server/rate-limit failure.
+      await expect(
+        page.getByText(/our servers are having trouble/i)
+      ).toBeVisible({ timeout: 8000 });
+
+      const skipLink = page.getByRole("button", { name: /skip this step/i });
+      await expect(skipLink).toBeVisible({ timeout: 5000 });
+
+      // Click skip — the API will return 500.
+      await skipLink.click();
+
+      // Warning toast must be visible before navigation completes.
+      await expect(
+        page.getByText(/couldn.t save your progress/i)
+      ).toBeVisible({ timeout: 5000 });
+
+      // User must still end up on /dashboard despite the API failure.
+      await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 });
+
+      // Sanity check: the failing skip endpoint really was hit.
+      expect(skipApiCalled).toBe(true);
+    }
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 test.describe("First-Quote Gate", () => {
   const testEmail = `pw-gate-${Date.now()}@example.com`;
 
