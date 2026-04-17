@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
@@ -14,6 +15,7 @@ export default function OnboardingCompletePage() {
   const quoteId = searchParams.get("quoteId");
   const previewFired = useRef(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const { refresh } = useAuth();
 
   const quoteQuery = useQuery<any>({
     queryKey: ["/api/quotes", quoteId],
@@ -43,13 +45,15 @@ export default function OnboardingCompletePage() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  function handleGoToDashboard() {
+  async function handleGoToDashboard() {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_COMPLETED, { cta: "dashboard" });
+    await refresh();
     navigate("/dashboard", { replace: true });
   }
 
-  function handleSendToLead() {
+  async function handleSendToLead() {
     trackEvent(AnalyticsEvents.ONBOARDING_GATE_COMPLETED, { cta: "send_lead" });
+    await refresh();
     navigate("/quotes/new", { replace: true });
   }
 
