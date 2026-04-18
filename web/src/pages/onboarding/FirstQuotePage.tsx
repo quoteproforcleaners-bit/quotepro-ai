@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "../../lib/auth";
@@ -8,15 +8,20 @@ import AddressAutocompleteLine from "../../components/AddressAutocompleteLine";
 import { Toast } from "../../components/ui";
 import { OwnHomeIcon } from "../../components/onboarding/OnboardingIcons";
 
+// Cool, restrained palette — no warm beige/tan anywhere on this page.
 const BRAND_GREEN = "#0F6E56";
 const BRAND_GREEN_DARK = "#0B5443";
-const BRAND_GOLD = "#C9920A";
-const TEXT_DARK = "#1A1A1A";
+const BRAND_GREEN_TINT = "#EEF7F3";
+const BRAND_GREEN_RECCARD = "#F6FAF8";
+const WIN_GOLD = "#C9920A"; // only for the 4.9 in the social proof line + tiny stars
+const TEXT_INK = "#111827";
+const TEXT_BODY = "#374151";
 const TEXT_MUTED = "#6B7280";
 const TEXT_FAINT = "#9CA3AF";
-const PAGE_BG = "#F8F9FA";
-const RECOMMENDED_BG = "#F7FBF9";
-const ICON_BG = "#E8F5F0";
+const HAIRLINE = "#E5E7EB";
+const COOL_TINT = "#E8EEF4";
+const PAGE_GRAD_TOP = "#FFFFFF";
+const PAGE_GRAD_BOT = "#F7F9FC";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
   apiPost("/api/analytics/events", { eventName, properties: properties || {} }).catch(() => {});
@@ -114,106 +119,191 @@ function AddressForm({
   );
 }
 
-// ── Tiny inline icons ─────────────────────────────────────────────────────
-const ClockIcon = () => (
-  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+// ── Inline icons ──────────────────────────────────────────────────────────
+const ClockIcon = ({ size = 14, color = TEXT_FAINT }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
   </svg>
 );
-const MailIcon = () => (
-  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const MailIcon = ({ size = 14, color = TEXT_FAINT }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="5" width="18" height="14" rx="2" />
     <polyline points="3,7 12,13 21,7" />
   </svg>
 );
-const PaperPlaneIcon = ({ size = 30 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={BRAND_GREEN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const PaperPlaneIcon = ({ size = 22, color = BRAND_GREEN }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M22 2L11 13" />
     <path d="M22 2l-7 20-4-9-9-4 20-7z" fill="rgba(15,110,86,0.10)" />
   </svg>
 );
+const StarIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={WIN_GOLD} aria-hidden="true">
+    <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" />
+  </svg>
+);
+const CheckIcon = ({ size = 12, color = "#fff" }: { size?: number; color?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
 
-// ── Mini auto-playing demo: a quote that builds itself ────────────────────
+// ── Demo glass card: 5-phase animation driven by React state ─────────────
+const DEMO_ADDRESS = "123 Maple Street, Austin TX";
+
 function DemoQuoteAnimation() {
+  // phase: 0=enter details, 1=AI loading, 2=tiers revealed, 3=send pressed, 4=hold/fade
+  const [phase, setPhase] = useState(0);
+  const [typed, setTyped] = useState("");
+  const [pressed, setPressed] = useState(false);
+  const [toast, setToast] = useState(false);
+  const [fadingOut, setFadingOut] = useState(false);
+  const [loopKey, setLoopKey] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    function clearAll() {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    }
+    function schedule(ms: number, fn: () => void) {
+      timers.current.push(setTimeout(fn, ms));
+    }
+
+    // Reset for this loop iteration.
+    setPhase(0);
+    setTyped("");
+    setPressed(false);
+    setToast(false);
+    setFadingOut(false);
+
+    // Phase 1: type address character-by-character (0 → 1500ms).
+    const TYPE_DURATION = 1100;
+    const stepMs = Math.max(28, Math.floor(TYPE_DURATION / DEMO_ADDRESS.length));
+    for (let i = 1; i <= DEMO_ADDRESS.length; i++) {
+      schedule(i * stepMs, () => setTyped(DEMO_ADDRESS.slice(0, i)));
+    }
+
+    // Phase 2: AI loading shimmer (1500 → 2500ms).
+    schedule(1500, () => setPhase(1));
+    // Phase 3: tier rows resolve (2500 → 5500ms).
+    schedule(2500, () => setPhase(2));
+    // Phase 4: send button + ripple + toast (5500 → 7500ms).
+    schedule(5500, () => setPhase(3));
+    schedule(6000, () => setPressed(true));
+    schedule(6300, () => setToast(true));
+    // Phase 5: hold then fade out (7500 → 10000ms).
+    schedule(8500, () => setFadingOut(true));
+    schedule(10000, () => setLoopKey((k) => k + 1));
+
+    return clearAll;
+  }, [loopKey]);
+
   return (
     <div style={styles.demoWrap} aria-hidden="true">
-      <div className="qp-demo-card" style={styles.demoCard}>
-        {/* Header */}
-        <div className="qp-demo-el qp-demo-header" style={styles.demoHeader}>
-          <span style={styles.demoLogoMark}>
-            <svg width={10} height={10} viewBox="0 0 24 24" fill="none">
-              <path d="M5 12l5 5L20 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span style={styles.demoLogoText}>QuotePro</span>
-          <span style={{ flex: 1 }} />
-          <span className="qp-demo-el qp-demo-sent" style={styles.demoSentBadge}>
-            <svg width={9} height={9} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            Sent
-          </span>
+      <div className={`qp-demo-card${fadingOut ? " qp-demo-fadeout" : ""}`} style={styles.demoCard}>
+        {/* In-card sent toast */}
+        <div style={{ ...styles.demoToast, opacity: toast ? 1 : 0, transform: toast ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(-10px)" }}>
+          <span style={styles.demoToastCheck}><CheckIcon size={10} /></span>
+          <span>Quote sent to customer</span>
         </div>
 
-        {/* Address line that "types in" */}
-        <div className="qp-demo-el qp-demo-addr" style={styles.demoAddr}>
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={TEXT_MUTED} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-            <circle cx="12" cy="10" r="3" />
-          </svg>
-          <span className="qp-demo-typing">123 Maple Street, Austin TX</span>
+        {/* Phase 1 — form with typing address + property pills */}
+        <div style={{ ...styles.demoBlock, opacity: phase === 0 ? 1 : 0, pointerEvents: "none", position: phase === 0 ? "relative" : "absolute" }}>
+          <div style={styles.demoFormLabel}>Home details</div>
+          <div style={styles.demoInput}>
+            <span style={{ color: TEXT_INK }}>{typed}</span>
+            <span className="qp-demo-caret" />
+          </div>
+          <div style={styles.demoPills}>
+            <span style={{ ...styles.demoPill, animationDelay: "0.4s" }} className="qp-demo-pill-fade">3 bed</span>
+            <span style={{ ...styles.demoPill, animationDelay: "0.65s" }} className="qp-demo-pill-fade">2 bath</span>
+            <span style={{ ...styles.demoPill, animationDelay: "0.9s" }} className="qp-demo-pill-fade">1,800 sqft</span>
+          </div>
         </div>
 
-        {/* Property pills */}
-        <div style={styles.demoPills}>
-          <span className="qp-demo-el qp-demo-pill-1" style={styles.demoPill}>3 bd</span>
-          <span className="qp-demo-el qp-demo-pill-2" style={styles.demoPill}>2 ba</span>
-          <span className="qp-demo-el qp-demo-pill-3" style={styles.demoPill}>1,800 sqft</span>
+        {/* Phase 2 — AI shimmer skeleton */}
+        <div style={{ ...styles.demoBlock, opacity: phase === 1 ? 1 : 0, pointerEvents: "none", position: phase === 1 ? "relative" : "absolute" }}>
+          <div style={styles.demoFormLabel}>Generating quote</div>
+          <div style={styles.demoSkeletonRow}><div className="qp-shimmer" style={styles.demoSkeleton} /></div>
+          <div style={styles.demoSkeletonRow}><div className="qp-shimmer" style={styles.demoSkeleton} /></div>
+          <div style={styles.demoSkeletonRow}><div className="qp-shimmer" style={styles.demoSkeleton} /></div>
+          <div style={styles.demoAILabel} className="qp-pulse">AI analyzing property...</div>
         </div>
 
-        {/* Three quote tiers */}
-        <div style={styles.demoTiers}>
-          <div className="qp-demo-el qp-demo-tier-1" style={styles.demoTier}>
-            <div style={styles.demoTierName}>Standard</div>
-            <div style={styles.demoTierPrice}>$185</div>
+        {/* Phase 3+ — three tier rows + send button */}
+        <div style={{ ...styles.demoBlock, opacity: phase >= 2 ? 1 : 0, pointerEvents: "none", position: phase >= 2 ? "relative" : "absolute" }}>
+          <div style={styles.demoFormLabel}>Your 3-tier quote</div>
+          <div style={styles.demoTiers}>
+            {[
+              { name: "Standard Clean", price: "$185", best: false },
+              { name: "Deep Clean", price: "$265", best: false },
+              { name: "Premium Clean", price: "$340", best: true },
+            ].map((t, i) => (
+              <div
+                key={t.name}
+                className={phase >= 2 ? "qp-tier-in" : ""}
+                style={{
+                  ...styles.demoTierRow,
+                  borderBottom: i < 2 ? `1px solid ${HAIRLINE}` : "none",
+                  animationDelay: `${i * 0.15}s`,
+                }}
+              >
+                <span style={{ ...styles.demoTierName, color: TEXT_BODY, fontWeight: t.best ? 700 : 500 }}>{t.name}</span>
+                <span style={styles.demoTierRight}>
+                  {t.best && <span style={styles.demoBestPill}>Best Value</span>}
+                  <span style={{ ...styles.demoTierPrice, color: t.best ? BRAND_GREEN : TEXT_BODY, fontWeight: t.best ? 800 : 600 }}>{t.price}</span>
+                </span>
+              </div>
+            ))}
           </div>
-          <div className="qp-demo-el qp-demo-tier-2" style={styles.demoTier}>
-            <div style={styles.demoTierName}>Deep Clean</div>
-            <div style={styles.demoTierPrice}>$245</div>
-          </div>
-          <div className="qp-demo-el qp-demo-tier-3 qp-demo-tier-best" style={{ ...styles.demoTier, ...styles.demoTierBest }}>
-            <div style={styles.demoTierBestBadge}>Best</div>
-            <div style={{ ...styles.demoTierName, color: BRAND_GREEN_DARK }}>Premium</div>
-            <div style={{ ...styles.demoTierPrice, color: BRAND_GREEN_DARK }}>$310</div>
-          </div>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled
+            className={pressed ? "qp-demo-btn qp-demo-btn-pressed" : "qp-demo-btn"}
+            style={{
+              ...styles.demoSendBtn,
+              opacity: phase >= 3 ? 1 : 0,
+              transform: phase >= 3 ? "translateY(0)" : "translateY(8px)",
+            }}
+          >
+            Send Quote
+          </button>
         </div>
       </div>
+      <p style={styles.demoCaption}>This is what your customers will see — in under 60 seconds.</p>
     </div>
   );
 }
 
-// ── Progress stepper ──────────────────────────────────────────────────────
+// ── Progress stepper (responsive: full on desktop, compact on mobile) ─────
 function ProgressStepper() {
   const steps = [
-    { label: "Send your first quote", active: true, done: false },
-    { label: "Set up your services", active: false, done: false },
-    { label: "Connect your calendar", active: false, done: false },
+    { label: "Send your first quote", active: true },
+    { label: "Set up your services", active: false },
+    { label: "Connect your calendar", active: false },
   ];
   return (
-    <div style={styles.stepperWrap} aria-label="Onboarding progress">
-      <div style={styles.stepperLine} />
-      {steps.map((s, i) => (
-        <div key={i} style={styles.stepItem}>
-          <div style={{ ...styles.stepDot, ...(s.active ? styles.stepDotActive : styles.stepDotIdle) }}>
-            {s.active ? <span style={styles.stepDotInner} /> : <span style={styles.stepNumber}>{i + 1}</span>}
+    <>
+      <div style={styles.stepperWrap} className="qp-stepper-full" aria-label="Onboarding progress">
+        <div style={styles.stepperLine} />
+        {steps.map((s, i) => (
+          <div key={i} style={styles.stepItem}>
+            <div style={{ ...styles.stepDot, ...(s.active ? styles.stepDotActive : styles.stepDotIdle) }}>
+              {s.active ? <span style={styles.stepDotInner} /> : <span style={styles.stepNumber}>{i + 1}</span>}
+            </div>
+            <span style={{ ...styles.stepLabel, color: s.active ? TEXT_INK : TEXT_FAINT, fontWeight: s.active ? 600 : 500 }}>
+              {s.label}
+            </span>
           </div>
-          <span style={{ ...styles.stepLabel, color: s.active ? BRAND_GREEN_DARK : TEXT_FAINT, fontWeight: s.active ? 700 : 500 }}>
-            {s.label}
-          </span>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+      <div style={styles.stepperCompact} className="qp-stepper-compact" aria-label="Onboarding progress">
+        Step 1 of 3
+      </div>
+    </>
   );
 }
 
@@ -355,10 +445,10 @@ export default function FirstQuotePage() {
     <div style={styles.page}>
       <style>{pageCss}</style>
 
-      {/* Animated aurora behind hero */}
-      <div className="qp-aurora" style={styles.aurora} aria-hidden="true">
-        <div className="qp-aurora-blob qp-aurora-green" />
-        <div className="qp-aurora-blob qp-aurora-gold" />
+      {/* Subtle cool ambient blobs (very light blue-gray, no warm tones) */}
+      <div className="qp-ambient" aria-hidden="true">
+        <div className="qp-ambient-blob qp-ambient-a" />
+        <div className="qp-ambient-blob qp-ambient-b" />
       </div>
 
       {skipWarning && (
@@ -388,7 +478,7 @@ export default function FirstQuotePage() {
           </section>
 
           {/* Stepper */}
-          <div className="qp-fade-up qp-delay-1">
+          <div className="qp-fade-up qp-delay-1" style={{ width: "100%", display: "flex", justifyContent: "center" }}>
             <ProgressStepper />
           </div>
 
@@ -409,8 +499,8 @@ export default function FirstQuotePage() {
                   style={styles.card}
                   aria-label="Quote a real lead"
                 >
-                  <div style={{ ...styles.cardIconCircle, background: ICON_BG }}>
-                    <PaperPlaneIcon />
+                  <div style={{ ...styles.cardIconCircle, background: BRAND_GREEN_TINT }}>
+                    <PaperPlaneIcon size={22} />
                   </div>
                   <h3 style={styles.cardTitle}>Quote a real lead</h3>
                   <p style={styles.cardDesc}>
@@ -434,13 +524,8 @@ export default function FirstQuotePage() {
                   style={{ ...styles.card, ...styles.cardRecommended }}
                   aria-label="Try it on your own home (recommended)"
                 >
-                  <span style={styles.recommendedBadge}>
-                    <svg width={10} height={10} viewBox="0 0 24 24" fill={BRAND_GOLD} aria-hidden="true">
-                      <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" />
-                    </svg>
-                    Recommended — fastest way to see it work
-                  </span>
-                  <div style={{ ...styles.cardIconCircle, background: ICON_BG }}>
+                  <span style={styles.recommendedBadge}>Recommended</span>
+                  <div style={{ ...styles.cardIconCircle, background: BRAND_GREEN_TINT }}>
                     <OwnHomeIcon size={44} />
                   </div>
                   <h3 style={styles.cardTitle}>Try it on your own home</h3>
@@ -460,12 +545,14 @@ export default function FirstQuotePage() {
 
               {/* Social proof */}
               <p className="qp-fade-up qp-delay-5" style={styles.socialProof}>
-                <svg width={13} height={13} viewBox="0 0 24 24" fill={BRAND_GOLD} aria-hidden="true" style={{ marginRight: 4 }}>
-                  <polygon points="12,2 15,9 22,9.5 17,14.5 18.5,22 12,18 5.5,22 7,14.5 2,9.5 9,9" />
-                </svg>
-                <span style={{ color: BRAND_GOLD, fontWeight: 700 }}>4.9</span>
-                &nbsp;from 127 reviews · Trusted by cleaning pros nationwide
+                <span style={styles.starsRow} aria-hidden="true">
+                  <StarIcon /><StarIcon /><StarIcon /><StarIcon /><StarIcon />
+                </span>
+                Rated&nbsp;<span style={{ color: WIN_GOLD, fontWeight: 700 }}>4.9</span>&nbsp;stars by 127 cleaning businesses
               </p>
+
+              {/* Footer breathing room */}
+              <div style={{ height: 40 }} />
             </>
           )}
 
@@ -512,56 +599,68 @@ const pageCss = `
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes qpAuroraGreen {
-  0%   { transform: translate(-15%, -10%) scale(1); }
-  50%  { transform: translate(20%, 10%) scale(1.15); }
-  100% { transform: translate(-15%, -10%) scale(1); }
+@keyframes qpAmbientA {
+  0%   { transform: translate(-10%, -8%) scale(1); }
+  50%  { transform: translate(8%, 6%) scale(1.08); }
+  100% { transform: translate(-10%, -8%) scale(1); }
 }
-@keyframes qpAuroraGold {
-  0%   { transform: translate(20%, 5%) scale(1.1); }
-  50%  { transform: translate(-10%, -10%) scale(0.95); }
-  100% { transform: translate(20%, 5%) scale(1.1); }
+@keyframes qpAmbientB {
+  0%   { transform: translate(8%, 4%) scale(1.05); }
+  50%  { transform: translate(-6%, -6%) scale(0.97); }
+  100% { transform: translate(8%, 4%) scale(1.05); }
+}
+
+.qp-ambient {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 560px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.qp-ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+}
+.qp-ambient-a {
+  width: 520px; height: 520px;
+  top: -160px; left: 6%;
+  background: rgba(232, 238, 244, 0.85);
+  animation: qpAmbientA 22s ease-in-out infinite;
+}
+.qp-ambient-b {
+  width: 460px; height: 460px;
+  top: -120px; right: 4%;
+  background: rgba(15, 110, 86, 0.06);
+  animation: qpAmbientB 26s ease-in-out infinite;
 }
 
 .qp-fade-up { animation: qpFadeUp 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.qp-delay-1 { animation-delay: 120ms; }
-.qp-delay-2 { animation-delay: 220ms; }
-.qp-delay-3 { animation-delay: 340ms; }
-.qp-delay-4 { animation-delay: 460ms; }
-.qp-delay-5 { animation-delay: 600ms; }
+.qp-delay-1 { animation-delay: 100ms; }
+.qp-delay-2 { animation-delay: 200ms; }
+.qp-delay-3 { animation-delay: 320ms; }
+.qp-delay-4 { animation-delay: 440ms; }
+.qp-delay-5 { animation-delay: 700ms; }
 
-.qp-aurora-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  will-change: transform;
-}
-.qp-aurora-green {
-  width: 520px; height: 520px;
-  top: -120px; left: 10%;
-  background: rgba(15, 110, 86, 0.12);
-  animation: qpAuroraGreen 18s ease-in-out infinite;
-}
-.qp-aurora-gold {
-  width: 460px; height: 460px;
-  top: -80px; right: 5%;
-  background: rgba(201, 146, 10, 0.08);
-  animation: qpAuroraGold 22s ease-in-out infinite;
-}
-
+/* Cards */
 .qp-card {
   text-align: left;
   cursor: pointer;
   font-family: inherit;
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .qp-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 12px 28px rgba(0,0,0,0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.06), 0 12px 32px rgba(0,0,0,0.06);
+  border-color: #D1D5DB;
 }
 .qp-card-recommended:hover {
-  box-shadow: 0 0 28px rgba(15,110,86,0.14), 0 12px 28px rgba(15,110,86,0.12);
   border-color: ${BRAND_GREEN_DARK};
+  box-shadow: 0 4px 8px rgba(15,110,86,0.08), 0 16px 36px rgba(15,110,86,0.10);
 }
 .qp-card:focus-visible {
   outline: 3px solid ${BRAND_GREEN};
@@ -584,88 +683,94 @@ button.qp-primary-btn:disabled { opacity: 0.7; cursor: not-allowed; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
 }
-@media (max-width: 720px) {
-  .qp-card-grid { grid-template-columns: 1fr; }
+
+/* Stepper visibility */
+.qp-stepper-compact { display: none; }
+
+@media (max-width: 768px) {
+  .qp-card-grid { grid-template-columns: 1fr; gap: 16px; padding: 0 4px; }
   .qp-card-recommended { order: -1; }
   .qp-card:hover { transform: none; }
 }
 @media (max-width: 480px) {
   .qp-demo-container { display: none; }
+  .qp-stepper-full { display: none !important; }
+  .qp-stepper-compact { display: block; }
 }
 
-/* ── Demo animation: builds a quote card over ~8s, loops infinitely ── */
-@keyframes qpDemoIn {
-  0%, 100% { opacity: 0; transform: translateY(6px); }
-  6%, 92%  { opacity: 1; transform: translateY(0); }
+/* ── Demo card animations ── */
+@keyframes qpDemoFadeOut {
+  to { opacity: 0; transform: translateY(-4px); }
 }
-@keyframes qpDemoTyping {
-  0%, 100% { width: 0; }
-  10%, 92% { width: 100%; }
-}
-@keyframes qpDemoBest {
-  0%, 38%, 100% {
-    box-shadow: 0 0 0 0 rgba(15,110,86,0);
-    border-color: rgba(15,110,86,0.10);
-    background: #fff;
-  }
-  44%, 92% {
-    box-shadow: 0 0 0 2px ${BRAND_GREEN}, 0 6px 18px -6px rgba(15,110,86,0.30);
-    border-color: ${BRAND_GREEN};
-    background: ${RECOMMENDED_BG};
-  }
-}
+.qp-demo-fadeout { animation: qpDemoFadeOut 500ms ease forwards; }
 
-.qp-demo-card {
-  animation: qpDemoIn 8s ease-in-out infinite;
+@keyframes qpPillIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.qp-demo-el {
+.qp-demo-pill-fade {
   opacity: 0;
-  animation: qpDemoIn 8s ease-in-out infinite;
+  animation: qpPillIn 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-.qp-demo-header  { animation-delay: 0.3s; }
-.qp-demo-addr    { animation-delay: 0.9s; }
-.qp-demo-pill-1  { animation-delay: 1.6s; }
-.qp-demo-pill-2  { animation-delay: 1.8s; }
-.qp-demo-pill-3  { animation-delay: 2.0s; }
-.qp-demo-tier-1  { animation-delay: 2.6s; }
-.qp-demo-tier-2  { animation-delay: 2.9s; }
-.qp-demo-tier-3  { animation-delay: 3.2s; }
-.qp-demo-sent    { animation-delay: 4.6s; }
 
-.qp-demo-tier-best {
-  animation: qpDemoBest 8s ease-in-out infinite;
+@keyframes qpCaretBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
 }
-.qp-demo-typing {
+.qp-demo-caret {
   display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  vertical-align: bottom;
-  width: 0;
-  animation: qpDemoTyping 8s steps(28, end) infinite;
-  animation-delay: 0.9s;
+  width: 1.5px;
+  height: 14px;
+  margin-left: 2px;
+  background: ${BRAND_GREEN};
+  vertical-align: -2px;
+  animation: qpCaretBlink 700ms steps(1) infinite;
 }
+
+@keyframes qpShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.qp-shimmer {
+  background: linear-gradient(90deg, #F3F4F6 0%, #E5E7EB 50%, #F3F4F6 100%);
+  background-size: 200% 100%;
+  animation: qpShimmer 1.4s linear infinite;
+}
+
+@keyframes qpPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.qp-pulse { animation: qpPulse 1.6s ease-in-out infinite; }
+
+@keyframes qpTierIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.qp-tier-in {
+  opacity: 0;
+  animation: qpTierIn 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes qpRipple {
+  0%   { box-shadow: 0 0 0 0 rgba(15,110,86,0.45); }
+  100% { box-shadow: 0 0 0 14px rgba(15,110,86,0); }
+}
+.qp-demo-btn-pressed { animation: qpRipple 600ms ease-out 1; }
 `;
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
     position: "relative",
-    background: PAGE_BG,
+    background: `linear-gradient(180deg, ${PAGE_GRAD_TOP} 0%, ${PAGE_GRAD_BOT} 100%)`,
     display: "flex",
     flexDirection: "column",
     fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
     overflowX: "hidden",
-  },
-  aurora: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 520,
-    overflow: "hidden",
-    pointerEvents: "none",
-    zIndex: 0,
   },
   topBar: {
     position: "relative",
@@ -693,7 +798,7 @@ const styles: Record<string, React.CSSProperties> = {
   logoText: {
     fontSize: 17,
     fontWeight: 800,
-    color: TEXT_DARK,
+    color: TEXT_INK,
     letterSpacing: "-0.4px",
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
   },
@@ -703,7 +808,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     display: "flex",
     justifyContent: "center",
-    padding: "24px 24px 64px",
+    padding: "28px 24px 80px",
   },
   content: {
     width: "100%",
@@ -711,24 +816,25 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: 28,
+    gap: 32,
   },
-  hero: { textAlign: "center", maxWidth: 640 },
+  hero: { textAlign: "center", maxWidth: 560, marginTop: 20 },
   headline: {
-    fontSize: "clamp(1.5rem, 4.4vw, 2.4rem)",
-    fontWeight: 800,
-    color: TEXT_DARK,
-    letterSpacing: "-1.2px",
+    fontSize: "clamp(1.75rem, 4.4vw, 2.5rem)",
+    fontWeight: 700,
+    color: TEXT_INK,
+    letterSpacing: "-0.02em",
     lineHeight: 1.1,
-    margin: "8px 0 12px",
+    margin: "0 0 16px",
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
   },
   subhead: {
-    fontSize: "1.1rem",
+    fontSize: "clamp(1rem, 2.4vw, 1.125rem)",
     color: TEXT_MUTED,
-    margin: 0,
+    margin: "0 auto",
     lineHeight: 1.55,
     fontWeight: 400,
+    maxWidth: 400,
   },
 
   // Stepper
@@ -738,9 +844,15 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     alignItems: "flex-start",
     width: "100%",
-    maxWidth: 560,
-    margin: "0 auto",
+    maxWidth: 480,
     padding: "0 8px",
+  },
+  stepperCompact: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: TEXT_MUTED,
+    letterSpacing: "0.3px",
+    textTransform: "uppercase",
   },
   stepperLine: {
     position: "absolute",
@@ -748,7 +860,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 40,
     right: 40,
     height: 2,
-    background: "#E5E7EB",
+    background: HAIRLINE,
     zIndex: 0,
   },
   stepItem: {
@@ -773,15 +885,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   stepDotActive: {
     background: BRAND_GREEN,
-    boxShadow: `0 0 0 4px rgba(15,110,86,0.15)`,
+    boxShadow: `0 0 0 4px rgba(15,110,86,0.12)`,
   },
   stepDotIdle: {
     background: "#fff",
-    border: "2px solid #E5E7EB",
+    border: `2px solid ${HAIRLINE}`,
   },
   stepDotInner: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: "50%",
     background: "#fff",
   },
@@ -791,173 +903,211 @@ const styles: Record<string, React.CSSProperties> = {
     color: TEXT_FAINT,
   },
   stepLabel: {
-    fontSize: 12,
+    fontSize: 12.5,
     textAlign: "center",
     lineHeight: 1.3,
     letterSpacing: "0.1px",
-    maxWidth: 120,
+    maxWidth: 130,
   },
 
-  // Demo card
+  // Demo
   demoWrap: {
     width: "100%",
     display: "flex",
-    justifyContent: "center",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 14,
     padding: "4px 0",
   },
   demoCard: {
+    position: "relative",
     width: "100%",
-    maxWidth: 320,
-    background: "#fff",
-    borderRadius: 16,
-    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-    padding: "16px 18px 18px",
-    border: "1px solid #EEF1F0",
-  },
-  demoHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
-  demoLogoMark: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
-    background: BRAND_GREEN,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  demoLogoText: {
-    fontSize: 12,
-    fontWeight: 800,
-    color: TEXT_DARK,
-    letterSpacing: "-0.2px",
-    fontFamily: '"Plus Jakarta Sans", sans-serif',
-  },
-  demoSentBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    background: "rgba(15,110,86,0.10)",
-    color: BRAND_GREEN_DARK,
-    fontSize: 10,
-    fontWeight: 700,
-    padding: "3px 8px",
-    borderRadius: 999,
-    letterSpacing: "0.3px",
-    textTransform: "uppercase",
-  },
-  demoAddr: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 12,
-    color: TEXT_MUTED,
-    marginBottom: 10,
+    maxWidth: 440,
+    minHeight: 230,
+    background: "rgba(255,255,255,0.72)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    border: "1px solid rgba(255,255,255,0.6)",
+    borderRadius: 20,
+    padding: "20px 22px 22px",
+    boxShadow:
+      "0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.06), 0 24px 48px rgba(17, 24, 39, 0.05)",
     overflow: "hidden",
+    transition: "opacity 400ms ease, transform 400ms ease",
+  },
+  demoBlock: {
+    inset: "20px 22px 22px",
+    width: "calc(100% - 0px)",
+    transition: "opacity 380ms cubic-bezier(0.4,0,0.2,1)",
+  },
+  demoFormLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: TEXT_FAINT,
+    letterSpacing: "0.6px",
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  demoInput: {
+    width: "100%",
+    minHeight: 38,
+    background: "#fff",
+    border: `1px solid ${HAIRLINE}`,
+    borderRadius: 10,
+    padding: "9px 12px",
+    fontSize: 13,
+    color: TEXT_INK,
+    marginBottom: 12,
+    fontFamily: "inherit",
+    boxSizing: "border-box",
   },
   demoPills: {
     display: "flex",
-    gap: 6,
-    marginBottom: 14,
+    gap: 8,
     flexWrap: "wrap",
   },
   demoPill: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: 600,
-    color: TEXT_MUTED,
+    color: TEXT_BODY,
     background: "#F3F4F6",
-    padding: "3px 9px",
+    padding: "5px 11px",
     borderRadius: 999,
   },
-  demoTiers: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
-    gap: 6,
+  demoSkeletonRow: { marginBottom: 8, height: 14 },
+  demoSkeleton: {
+    height: 14,
+    borderRadius: 7,
+    width: "100%",
   },
-  demoTier: {
-    position: "relative",
-    background: "#fff",
-    border: "1.5px solid #EEF1F0",
-    borderRadius: 10,
-    padding: "10px 8px",
+  demoAILabel: {
+    marginTop: 12,
+    fontSize: 12,
+    color: TEXT_FAINT,
     textAlign: "center",
-    transition: "all 200ms ease",
+    fontWeight: 500,
   },
-  demoTierBest: {},
-  demoTierBestBadge: {
-    position: "absolute",
-    top: -7,
-    left: "50%",
-    transform: "translateX(-50%)",
-    background: BRAND_GREEN,
+  demoTiers: {
+    background: "#fff",
+    border: `1px solid ${HAIRLINE}`,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  demoTierRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "12px 14px",
+  },
+  demoTierName: {
+    fontSize: 13,
+    letterSpacing: "-0.1px",
+  },
+  demoTierRight: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  demoTierPrice: {
+    fontSize: 14,
+    fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
+    letterSpacing: "-0.2px",
+  },
+  demoBestPill: {
+    fontSize: 9.5,
+    fontWeight: 700,
     color: "#fff",
-    fontSize: 8.5,
-    fontWeight: 800,
+    background: BRAND_GREEN,
     padding: "2px 7px",
     borderRadius: 999,
     letterSpacing: "0.4px",
     textTransform: "uppercase",
   },
-  demoTierName: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: TEXT_MUTED,
-    marginBottom: 2,
-    letterSpacing: "0.2px",
+  demoSendBtn: {
+    width: "100%",
+    marginTop: 12,
+    background: BRAND_GREEN,
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "default",
+    transition: "opacity 320ms ease, transform 320ms ease",
   },
-  demoTierPrice: {
-    fontSize: 16,
-    fontWeight: 800,
-    color: TEXT_DARK,
-    fontFamily: '"Plus Jakarta Sans", sans-serif',
-    letterSpacing: "-0.3px",
+  demoToast: {
+    position: "absolute",
+    top: 14,
+    left: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    background: "#fff",
+    color: TEXT_BODY,
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "8px 14px 8px 10px",
+    borderRadius: 999,
+    boxShadow: "0 4px 14px rgba(17, 24, 39, 0.10), 0 1px 3px rgba(17, 24, 39, 0.06)",
+    zIndex: 5,
+    transition: "opacity 320ms cubic-bezier(0.22,1,0.36,1), transform 320ms cubic-bezier(0.22,1,0.36,1)",
+    whiteSpace: "nowrap",
+  },
+  demoToastCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: "50%",
+    background: BRAND_GREEN,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  demoCaption: {
+    fontSize: "0.875rem",
+    color: TEXT_FAINT,
+    fontStyle: "italic",
+    margin: 0,
+    textAlign: "center",
   },
 
   // Cards
   card: {
     background: "#fff",
-    border: "1px solid #EEF1F0",
+    border: `1px solid ${HAIRLINE}`,
     borderRadius: 16,
-    padding: 28,
+    padding: 32,
     display: "flex",
     flexDirection: "column",
-    gap: 12,
+    gap: 14,
     position: "relative",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)",
-    minHeight: 280,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
+    minHeight: 290,
   },
   cardRecommended: {
     border: `2px solid ${BRAND_GREEN}`,
-    background: RECOMMENDED_BG,
-    boxShadow:
-      "0 0 20px rgba(15,110,86,0.08), 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)",
-    paddingTop: 32,
+    background: BRAND_GREEN_RECCARD,
+    paddingTop: 36,
   },
   recommendedBadge: {
     position: "absolute",
     top: -12,
-    left: 20,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    background: "#fff",
-    color: BRAND_GREEN_DARK,
-    fontSize: 10.5,
-    fontWeight: 800,
-    letterSpacing: "0.5px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: BRAND_GREEN,
+    color: "#fff",
+    fontSize: "0.6875rem",
+    fontWeight: 700,
+    letterSpacing: "0.05em",
     textTransform: "uppercase",
-    padding: "5px 11px",
-    borderRadius: 20,
-    border: `2px solid ${BRAND_GREEN}`,
-    boxShadow: "0 4px 10px -4px rgba(15,110,86,0.25)",
+    padding: "6px 16px",
+    borderRadius: 100,
     whiteSpace: "nowrap",
+    boxShadow: "0 4px 10px -4px rgba(15,110,86,0.45)",
   },
   cardIconCircle: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",
@@ -965,17 +1115,17 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 4,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: "1.25rem",
     fontWeight: 700,
-    color: TEXT_DARK,
+    color: TEXT_INK,
     margin: 0,
     letterSpacing: "-0.4px",
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
   },
   cardDesc: {
-    fontSize: 14.5,
+    fontSize: "0.9375rem",
     color: TEXT_MUTED,
-    lineHeight: 1.55,
+    lineHeight: 1.6,
     margin: 0,
     flex: 1,
   },
@@ -983,10 +1133,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     gap: 5,
-    fontSize: 11.5,
-    fontWeight: 600,
+    fontSize: 12,
+    fontWeight: 500,
     color: TEXT_FAINT,
-    background: "#F3F4F6",
+    background: COOL_TINT,
     padding: "5px 10px",
     borderRadius: 20,
     alignSelf: "flex-start",
@@ -1034,13 +1184,19 @@ const styles: Record<string, React.CSSProperties> = {
   socialProof: {
     display: "inline-flex",
     alignItems: "center",
-    gap: 4,
-    fontSize: "0.9rem",
+    gap: 8,
+    fontSize: "0.875rem",
     color: TEXT_FAINT,
-    margin: 0,
+    fontWeight: 400,
+    margin: "8px 0 0",
     textAlign: "center",
     flexWrap: "wrap",
     justifyContent: "center",
+  },
+  starsRow: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 2,
   },
 
   // Own-home form
@@ -1065,17 +1221,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   formCard: {
     background: "#fff",
-    border: "1px solid #EEF1F0",
+    border: `1px solid ${HAIRLINE}`,
     borderRadius: 16,
     padding: "32px 32px 28px",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
     display: "flex",
     flexDirection: "column",
   },
   subHeading: {
     fontSize: 22,
     fontWeight: 700,
-    color: TEXT_DARK,
+    color: TEXT_INK,
     margin: "0 0 6px",
     letterSpacing: "-0.4px",
     fontFamily: '"Plus Jakarta Sans", "Inter", sans-serif',
@@ -1085,12 +1241,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: "block",
     fontSize: 13,
     fontWeight: 600,
-    color: "#374151",
+    color: TEXT_BODY,
     marginBottom: 6,
   },
   input: {
     width: "100%",
-    border: "1.5px solid #E5E7EB",
+    border: `1.5px solid ${HAIRLINE}`,
     borderRadius: 10,
     padding: "12px 14px",
     fontSize: 15,
