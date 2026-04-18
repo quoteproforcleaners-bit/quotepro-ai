@@ -932,12 +932,13 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "20px 22px 22px",
     boxShadow:
       "0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.06), 0 24px 48px rgba(17, 24, 39, 0.05)",
-    overflow: "hidden",
     transition: "opacity 400ms ease, transform 400ms ease",
   },
   demoBlock: {
-    inset: "20px 22px 22px",
-    width: "calc(100% - 0px)",
+    top: 20,
+    left: 22,
+    right: 22,
+    bottom: 22,
     transition: "opacity 380ms cubic-bezier(0.4,0,0.2,1)",
   },
   demoFormLabel: {
@@ -1038,7 +1039,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   demoToast: {
     position: "absolute",
-    top: 14,
+    top: -18,
     left: "50%",
     display: "inline-flex",
     alignItems: "center",
