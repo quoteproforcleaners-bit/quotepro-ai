@@ -43,7 +43,9 @@ app-example
 /android
 
 # Web app build
-web/dist/
+# web/dist/ — committed so production deploy ships the latest web bundle
+# (deploy build script only rebuilds the server, not the web frontend)
+!web/dist/
 
 # Large asset/build directories
 attached_assets/
