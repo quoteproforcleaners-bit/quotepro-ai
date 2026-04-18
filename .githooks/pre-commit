@@ -1,0 +1,22 @@
+#!/bin/bash
+# Pre-commit hook: keeps web/dist in sync with web/src.
+#
+# If any web source file (or anything that affects the web bundle) is
+# staged, rebuild the web bundle and re-stage web/dist so the resulting
+# commit always contains a fresh, deployable bundle. Without this the
+# Replit deploy ships a stale bundle (deploy build only rebuilds the
+# server, not the Vite frontend).
+
+set -e
+
+# Files staged for this commit (added/copied/modified/renamed only).
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+# Triggers: any change to web app sources, shared code the web pulls in,
+# vite/tsconfig configuration, or static assets the web ships.
+if echo "$staged" | grep -qE '^(web/(src|public|index\.html|vite\.config\.ts|tsconfig\.json|tailwind\.config\.[jt]s|postcss\.config\.[jt]s)|shared/)'; then
+  echo "[pre-commit] Web sources changed — rebuilding web/dist bundle..."
+  bash scripts/build-web.sh
+else
+  echo "[pre-commit] No web source changes detected — skipping web build."
+fi
