@@ -474,30 +474,37 @@ export async function buildFinanceSnapshot(businessId: string, business: any) {
 // Express delivery: raw body required — ensure this is mounted BEFORE body-parser.
 router.post("/webhook/stripe", async (req: Request, res: Response) => {
   const connectedAccountId = req.headers["stripe-account"] as string | undefined;
-  const payload = (req as any).rawBody || req.body;
+
+  const stripe = getStripe();
+  if (!stripe) return res.status(503).send("Stripe not configured");
+
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error("[stripe-webhook] STRIPE_WEBHOOK_SECRET not configured — refusing to process event");
+    return res.status(500).send("Webhook secret not configured");
+  }
+
+  const sig = req.headers["stripe-signature"];
+  if (!sig) {
+    console.error("[stripe-webhook] Missing stripe-signature header");
+    return res.status(400).send("Missing stripe-signature header");
+  }
+
+  const rawBody = (req as any).rawBody;
+  if (!rawBody) {
+    console.error("[stripe-webhook] Missing raw request body — cannot verify signature");
+    return res.status(400).send("Missing raw request body");
+  }
+
+  let event: any;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody as Buffer, sig as string, secret);
+  } catch (err: any) {
+    console.error("[stripe-webhook] Signature verification failed:", err.message);
+    return res.status(400).send("Invalid signature");
+  }
 
   try {
-    const stripe = getStripe();
-    if (!stripe) return res.status(503).send("Stripe not configured");
-
-    let event: any;
-    const sig = req.headers["stripe-signature"];
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (sig && secret) {
-      try {
-        event = stripe.webhooks.constructEvent(
-          typeof payload === "string" ? payload : JSON.stringify(payload),
-          sig,
-          secret
-        );
-      } catch {
-        event = typeof payload === "string" ? JSON.parse(payload) : payload;
-      }
-    } else {
-      event = typeof payload === "string" ? JSON.parse(payload) : payload;
-    }
-
     const { type, data } = event;
     const obj = data?.object;
 

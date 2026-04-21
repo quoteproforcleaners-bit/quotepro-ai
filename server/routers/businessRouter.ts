@@ -867,8 +867,13 @@ pool.query(`
         return res.status(400).send("Missing stripe-signature header");
       }
       if (!webhookSecret) {
-        console.error("Stripe webhook: STRIPE_WEBHOOK_SECRET not configured — rejecting request");
-        return res.status(400).send("Webhook secret not configured");
+        console.error("Stripe webhook: STRIPE_WEBHOOK_SECRET not configured — refusing to process event");
+        return res.status(500).send("Webhook secret not configured");
+      }
+
+      if (!req.rawBody) {
+        console.error("Stripe webhook: missing raw request body — cannot verify signature");
+        return res.status(400).send("Missing raw request body");
       }
 
       let event: any;
@@ -877,7 +882,7 @@ pool.query(`
       } catch (err: any) {
         console.error("Webhook signature verification failed:", err.message);
         trackEvent("system", "WEBHOOK_SIGNATURE_FAILED", { error: err.message }).catch(() => {});
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+        return res.status(400).send("Invalid signature");
       }
 
       // Idempotency gate: insert BEFORE processing so Stripe retries are no-ops.
