@@ -1115,7 +1115,7 @@ pool.query(`
               break;
             }
             await updateUser(deletedUserId, {
-              subscriptionTier: "starter",
+              subscriptionTier: "free",
               subscriptionExpiresAt: new Date(),
               stripeSubscriptionId: deletedSub.id,
               stripeSubscriptionStatus: deletedSub.status,
@@ -1126,7 +1126,7 @@ pool.query(`
               `UPDATE users SET payment_failed_at = NULL, payment_failure_count = 0 WHERE id = $1`,
               [deletedUserId]
             );
-            console.log(`[webhook] subscription.deleted → user ${deletedUserId} downgraded to starter, payment failure fields reset`);
+            console.log(`[webhook] subscription.deleted → user ${deletedUserId} downgraded to free, payment failure fields reset`);
           }
           break;
         }
@@ -1146,14 +1146,14 @@ pool.query(`
             const isActive = subscription.status === "active" || subscription.status === "trialing";
             const planFromMeta = subscription.metadata?.plan || "growth";
             await updateUser(userId, {
-              subscriptionTier: isActive ? planFromMeta : "starter",
+              subscriptionTier: isActive ? planFromMeta : "free",
               subscriptionExpiresAt: isActive ? null : new Date(),
               stripeSubscriptionId: subscription.id,
               stripeSubscriptionStatus: subscription.status,
               subscriptionPlatform: isActive ? "stripe" : null,
               subscriptionSyncedAt: new Date(),
             } as any);
-            console.log(`[webhook] subscription.updated → user ${userId} ${isActive ? "active (" + planFromMeta + ")" : "downgraded to starter"}`);
+            console.log(`[webhook] subscription.updated → user ${userId} ${isActive ? "active (" + planFromMeta + ")" : "downgraded to free"}`);
 
             // Autopilot entitlement sync
             const autopilotPriceId = process.env.STRIPE_AUTOPILOT_PRICE_ID;
