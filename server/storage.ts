@@ -379,6 +379,24 @@ export async function deleteCustomer(id: string): Promise<void> {
 
 // ─── Quotes ───
 
+/**
+ * Returns the count of quotes created in the CURRENT calendar month for a
+ * business. Used by the quote-quota gate so Starter's "20/month" cap actually
+ * resets at the start of each month rather than being a lifetime cap.
+ * Soft-deleted quotes (deleted_at IS NOT NULL) are excluded.
+ */
+export async function getQuoteCountThisMonth(businessId: string): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count
+       FROM quotes
+      WHERE business_id = $1
+        AND deleted_at IS NULL
+        AND created_at >= date_trunc('month', NOW())`,
+    [businessId]
+  );
+  return parseInt(result.rows[0]?.count ?? "0", 10);
+}
+
 export async function getQuotesByBusiness(
   businessId: string,
   opts?: { status?: string; customerId?: string }

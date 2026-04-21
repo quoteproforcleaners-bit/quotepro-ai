@@ -40,7 +40,7 @@ import {
   getBusinessByOwner, createBusiness, updateBusiness,
   getPricingByBusiness, upsertPricingSettings,
   getCustomersByBusiness, getCustomerById, createCustomer, updateCustomer, deleteCustomer,
-  getQuotesWithCustomersByBusiness, getQuotesByBusiness, getQuoteById, getQuoteByToken, createQuote, updateQuote,
+  getQuotesWithCustomersByBusiness, getQuotesByBusiness, getQuoteCountThisMonth, getQuoteById, getQuoteByToken, createQuote, updateQuote,
   deleteQuote as deleteQuoteRow,
   getLineItemsByQuote, createLineItem, deleteLineItemsByQuote,
   getJobsByBusiness, getJobById, createJob, updateJob, deleteJob,
@@ -130,7 +130,6 @@ const router = Router();
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const allQuotes = await getQuotesByBusiness(business.id);
       const user = await getUserById(req.session.userId!);
       const tier = user?.subscriptionTier || "free";
       const isPaid = isGrowthOrAbove(tier);
@@ -140,7 +139,9 @@ const router = Router();
       const userAgeDays = trialRef ? Math.floor((Date.now() - new Date(trialRef).getTime()) / 86_400_000) : 999;
       const isInFreeTrial = tier === "free" && userAgeDays < FREE_TRIAL_DAYS;
       const limit = isStarter ? 20 : (isPaid ? Infinity : (isInFreeTrial ? 20 : 3));
-      return res.json({ count: allQuotes.length, limit: limit === Infinity ? null : limit, isPro: isPaid, isInFreeTrial });
+      // Quota counts quotes from the CURRENT calendar month, not lifetime.
+      const quoteCount = isPaid ? 0 : await getQuoteCountThisMonth(business.id);
+      return res.json({ count: quoteCount, limit: limit === Infinity ? null : limit, isPro: isPaid, isInFreeTrial });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quote count" });
     }
@@ -227,7 +228,9 @@ const router = Router();
 
       const user = await getUserById(req.session.userId!);
       if (user && !isGrowthOrAbove(user.subscriptionTier)) {
-        const existingQuotes = await getQuotesByBusiness(business.id);
+        // Count quotes from the CURRENT calendar month — Starter's "20/mo"
+        // cap resets on the 1st instead of being a lifetime cap.
+        const quoteCount = await getQuoteCountThisMonth(business.id);
         const FREE_TRIAL_DAYS = 14;
         // Use trialStartedAt if available, fall back to createdAt
         const trialRef = (user as any).trialStartedAt ?? user.createdAt;
@@ -236,7 +239,7 @@ const router = Router();
           : 999;
         const isInFreeTrial = user.subscriptionTier === "free" && userAgeDays < FREE_TRIAL_DAYS;
         const quoteCap = user.subscriptionTier === "starter" ? 20 : (isInFreeTrial ? 20 : 3);
-        if (existingQuotes.length >= quoteCap) {
+        if (quoteCount >= quoteCap) {
           trackEvent(req.session.userId!, AnalyticsEvents.QUOTE_QUOTA_HIT, { quoteCap, tier: user.subscriptionTier }).catch(() => {});
           return res.status(403).json({
             message: user.subscriptionTier === "starter"
