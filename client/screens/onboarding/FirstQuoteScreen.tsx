@@ -36,12 +36,14 @@ const CLEANING_TYPES = [
   { id: "regular", label: "Standard Clean" },
   { id: "deep-clean", label: "Deep Clean" },
   { id: "move-in-out", label: "Move-Out Clean" },
+  { id: "airbnb", label: "Airbnb Turnover" },
 ];
 
 const TIER_META: Record<string, { tier: string; tagline: string }> = {
   "regular": { tier: "Good", tagline: "Basic upkeep cleaning for maintained homes" },
   "deep-clean": { tier: "Better", tagline: "Detailed recurring clean with extra attention" },
   "move-in-out": { tier: "Best", tagline: "Top-to-bottom deep clean for move-in or move-out" },
+  "airbnb": { tier: "Turnover", tagline: "Fast turnover cleaning between short-term guests" },
 };
 
 const DEEPER_FEATURES = [
@@ -108,7 +110,13 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
       kitchensCount: 1,
     };
 
-    const typeIds = ["regular", "deep-clean", "move-in-out"];
+    const typeIds = ["regular", "deep-clean", "move-in-out", "airbnb"];
+    const labelFor = (id: string) =>
+      id === "regular" ? "Standard Clean"
+      : id === "deep-clean" ? "Deep Clean"
+      : id === "move-in-out" ? "Move-Out Clean"
+      : id === "airbnb" ? "Airbnb Turnover"
+      : id;
     const options: { id: string; label: string; option: QuoteOption; recommended: boolean }[] = [];
     typeIds.forEach((id) => {
       const svc = getServiceTypeById(settings, id);
@@ -116,7 +124,7 @@ export default function FirstQuoteScreen({ pricingSettings, onComplete }: Props)
         const opt = calculateQuoteOption(homeDetails, EMPTY_ADDONS, "one-time", svc, settings, svc.name);
         options.push({
           id,
-          label: id === "regular" ? "Standard Clean" : id === "deep-clean" ? "Deep Clean" : "Move-Out Clean",
+          label: labelFor(id),
           option: opt,
           recommended: id === selectedType,
         });

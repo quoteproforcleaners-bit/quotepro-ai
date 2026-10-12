@@ -15,6 +15,7 @@
 
 import { pool } from "./db";
 import { sendEmail, getBusinessSendParams } from "./mail";
+import { acquireLock, releaseLock } from "./lockManager";
 
 const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 
@@ -33,6 +34,19 @@ interface PendingFollowUp {
 }
 
 export async function processSentQuoteFollowUps(): Promise<void> {
+  const got = await acquireLock("quote-followups", 10);
+  if (!got) {
+    console.log("[quote-followup] Skipped — another instance holds the lock.");
+    return;
+  }
+  try {
+    await runSentQuoteFollowUps();
+  } finally {
+    await releaseLock("quote-followups");
+  }
+}
+
+async function runSentQuoteFollowUps(): Promise<void> {
   // 1. Find all quotes that are ripe for a follow-up
   const pendingResult = await pool.query<PendingFollowUp>(`
     SELECT
@@ -53,12 +67,31 @@ export async function processSentQuoteFollowUps(): Promise<void> {
     LEFT JOIN customers c ON c.id = q.customer_id
     WHERE q.status = 'sent'
       AND q.sent_at IS NOT NULL
-      AND q.sent_at < NOW() - INTERVAL '3 days'
       AND c.email IS NOT NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM quote_follow_ups qf
-        WHERE qf.quote_id = q.id
-          AND qf.status = 'sent'
+      AND (
+        -- 1st touch: 3 days after sending, no prior follow-up
+        (
+          q.sent_at < NOW() - INTERVAL '3 days'
+          AND NOT EXISTS (
+            SELECT 1 FROM quote_follow_ups qf
+            WHERE qf.quote_id = q.id AND qf.status = 'sent'
+          )
+        )
+        -- 2nd touch: 7 days after sending, exactly one prior follow-up,
+        -- and the prior one was at least 3 days ago
+        OR (
+          q.sent_at < NOW() - INTERVAL '7 days'
+          AND (
+            SELECT COUNT(*) FROM quote_follow_ups qf
+            WHERE qf.quote_id = q.id AND qf.status = 'sent'
+          ) = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM quote_follow_ups qf
+            WHERE qf.quote_id = q.id
+              AND qf.status = 'sent'
+              AND qf.sent_at > NOW() - INTERVAL '3 days'
+          )
+        )
       )
     LIMIT 50
   `);
@@ -89,30 +122,60 @@ export async function processSentQuoteFollowUps(): Promise<void> {
         maximumFractionDigits: 0,
       });
 
-      const subject = `Quick check-in on your cleaning quote`;
+      // Determine whether this is the 1st or 2nd touch
+      const priorTouchResult = await pool.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n FROM quote_follow_ups WHERE quote_id = $1 AND status = 'sent'`,
+        [row.quoteId]
+      );
+      const priorTouches = Number(priorTouchResult.rows[0]?.n || 0);
+      const isSecondTouch = priorTouches >= 1;
+
+      const subject = isSecondTouch
+        ? `Last check-in on your ${company} quote`
+        : `Quick check-in on your cleaning quote`;
+
+      const bodyParagraphs = isSecondTouch
+        ? `
+          <p style="font-size: 16px; line-height: 1.6;">
+            I'm circling back one last time on the cleaning quote we sent
+            (${total}). I don't want to keep cluttering your inbox, so this
+            will be the final follow-up from us.
+          </p>
+          <p style="font-size: 16px; line-height: 1.6;">
+            If timing or pricing is an issue, just reply and let me know — I can
+            usually find a way to make it work. You can also chat with our
+            assistant right on the quote page for instant answers about pricing,
+            add-ons, or rescheduling.
+          </p>
+        `
+        : `
+          <p style="font-size: 16px; line-height: 1.6;">
+            I wanted to follow up on the cleaning quote we sent you a few days ago
+            (${total}). We'd love to get you scheduled and take cleaning off your
+            plate completely.
+          </p>
+          <p style="font-size: 16px; line-height: 1.6;">
+            Have questions about what's included, pricing, or scheduling? Reply
+            here, or open the quote page and chat with our assistant for instant
+            answers.
+          </p>
+        `;
+
       const html = `
         <div style="font-family: Inter, Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #1e293b;">
           <p style="font-size: 16px;">Hi ${firstName},</p>
-          <p style="font-size: 16px; line-height: 1.6;">
-            I wanted to follow up on the cleaning quote we sent you a few days ago
-            (${total}). We'd love to get you scheduled and take cleaning off your plate
-            completely.
-          </p>
-          <p style="font-size: 16px; line-height: 1.6;">
-            If you have any questions about what's included, pricing, or scheduling,
-            just reply to this email — I'm happy to help.
-          </p>
+          ${bodyParagraphs}
           ${quoteLink ? `
           <div style="margin: 28px 0; text-align: center;">
             <a href="${quoteLink}"
                style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #2563eb, #4f46e5);
                       color: #fff; font-weight: 700; border-radius: 10px; text-decoration: none; font-size: 15px;">
-              View Your Quote
+              ${isSecondTouch ? "Open Your Quote" : "View Your Quote"}
             </a>
           </div>
           ` : ""}
           <p style="font-size: 15px; color: #64748b;">
-            Looking forward to hearing from you,<br/>
+            ${isSecondTouch ? "Either way, thanks for considering us" : "Looking forward to hearing from you"},<br/>
             <strong>${row.ownerName || company}</strong><br/>
             <span style="font-size: 13px;">${company}</span>
           </p>

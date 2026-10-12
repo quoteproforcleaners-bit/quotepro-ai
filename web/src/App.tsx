@@ -17,6 +17,8 @@ import { Layout } from "./components/Layout";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import PaywallPage from "./pages/PaywallPage";
 import PricingPage from "./pages/PricingPage";
 import PricingSuccessPage from "./pages/PricingSuccessPage";
@@ -62,6 +64,8 @@ import QBOSettingsPage from "./pages/QBOSettingsPage";
 import QuotePreferencesPage from "./pages/QuotePreferencesPage";
 import ProSetupChecklistPage from "./pages/ProSetupChecklistPage";
 import AccountSettingsPage from "./pages/AccountSettingsPage";
+import TeamPage from "./pages/TeamPage";
+import InviteAcceptPage from "./pages/InviteAcceptPage";
 import FileLibraryPage from "./pages/FileLibraryPage";
 import EmailSequencesPage from "./pages/EmailSequencesPage";
 import PricingLogicPage from "./pages/PricingLogicPage";
@@ -172,6 +176,14 @@ export default function App() {
             )
           }
         />
+        <Route
+          path="/forgot-password"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />}
+        />
+        <Route
+          path="/reset-password"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ResetPasswordPage />}
+        />
         <Route path="/checkin/:token" element={<JobCheckinPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/upgrade" element={<Navigate to="/pricing" replace />} />
@@ -278,7 +290,11 @@ export default function App() {
           <Route path="/pricing-logic" element={<PricingLogicPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/account-settings" element={<AccountSettingsPage />} />
+          <Route path="/account/team" element={<TeamPage />} />
         </Route>
+
+        {/* Team-invitation acceptance — public landing, auth-gated accept action */}
+        <Route path="/invite/accept" element={<InviteAcceptPage />} />
 
         {/* Public commercial cleaning cost calculator — no auth required */}
         <Route path="/commercial-cleaning-calculator" element={<CommercialCalculatorPage />} />

@@ -15,6 +15,7 @@ import rateLimit from "express-rate-limit";
 import { pool } from "./db";
 import { getUserById } from "./storage";
 import { createPgRateLimitStore } from "./rateLimitStore";
+import { verifyPaidAccess } from "./services/paidAccess";
 import {
   isGrowthOrAbove as _isGrowthOrAbove,
   isStarterOrAbove as _isStarterOrAbove,
@@ -31,7 +32,7 @@ export function isGrowthOrAbove(tier: string | null | undefined): boolean {
 }
 
 export function isProTier(tier: string | null | undefined): boolean {
-  return tier === "pro";
+  return tier === "growth" || tier === "pro";
 }
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
@@ -50,10 +51,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 /** Requires Starter tier or above. */
 export async function requireStarter(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await getUserById(req.session.userId!);
-    if (!user || !isStarterOrAbove(user.subscriptionTier)) {
+    const access = res.locals.paidAccess ?? await verifyPaidAccess(req.session.userId!);
+    res.locals.paidAccess = access;
+    if (!isStarterOrAbove(access.tier)) {
       res.status(403).json({
-        message: "This feature requires a Starter or higher subscription",
+        message: "This feature requires a Basic or AI subscription",
         requiresUpgrade: true,
       });
       return;
@@ -71,10 +73,11 @@ export async function requireStarter(req: Request, res: Response, next: NextFunc
  */
 export async function requireGrowth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await getUserById(req.session.userId!);
-    if (!user || !isGrowthOrAbove(user.subscriptionTier)) {
+    const access = res.locals.paidAccess ?? await verifyPaidAccess(req.session.userId!);
+    res.locals.paidAccess = access;
+    if (!isGrowthOrAbove(access.tier)) {
       res.status(403).json({
-        message: "This feature requires a Growth or Pro subscription",
+        message: "This feature requires an AI subscription",
         requiresUpgrade: true,
       });
       return;
@@ -91,10 +94,11 @@ export async function requireGrowth(req: Request, res: Response, next: NextFunct
  */
 export async function requirePro(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await getUserById(req.session.userId!);
-    if (!user || !isProTier(user.subscriptionTier)) {
+    const access = res.locals.paidAccess ?? await verifyPaidAccess(req.session.userId!);
+    res.locals.paidAccess = access;
+    if (!isProTier(access.tier)) {
       res.status(403).json({
-        message: "This feature requires a Pro subscription",
+        message: "This feature requires an AI subscription",
         requiresUpgrade: true,
       });
       return;

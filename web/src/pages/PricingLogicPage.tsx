@@ -15,6 +15,8 @@ const SERVICE_TYPES = [
  { value:"standard", label:"Standard Clean"},
  { value:"deep-clean", label:"Deep Clean"},
  { value:"move-in-out", label:"Move-In / Move-Out"},
+ { value:"airbnb", label:"Airbnb Turnover"},
+ { value:"post-construction", label:"Post-Construction"},
  { value:"recurring", label:"Recurring Clean"},
  { value:"commercial", label:"Commercial"},
 ];

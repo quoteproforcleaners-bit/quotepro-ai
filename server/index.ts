@@ -51,6 +51,10 @@ function setupCors(app: express.Application) {
 
     if (process.env.REPLIT_DEV_DOMAIN) {
       origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+      if (process.env.NODE_ENV !== "production") {
+        const [projectHost, ...suffix] = process.env.REPLIT_DEV_DOMAIN.split(".");
+        origins.add(`https://${projectHost}.expo.${suffix.join(".")}`);
+      }
     }
 
     if (process.env.REPLIT_DOMAINS) {
@@ -250,6 +254,18 @@ function configureExpoAndLanding(app: express.Application) {
     res.status(200).json({ status: "ok", ts: Date.now() });
   });
 
+  // SEO: explicit robots.txt + sitemap reference.
+  app.get("/robots.txt", (req: Request, res: Response) => {
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    const host = req.hostname || req.headers.host || "getquotepro.ai";
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.removeHeader("X-Robots-Tag");
+    res.status(200).send(
+      `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /app/\n\nSitemap: ${proto}://${host}/sitemap.xml\n`,
+    );
+  });
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/q/") || req.path === "/privacy" || req.path === "/terms") {
       return next();
@@ -389,8 +405,9 @@ function configureExpoAndLanding(app: express.Application) {
     // Top-level web app routes that need SPA fallback (for direct navigation & ad tracking)
     const TOP_LEVEL_SPA_ROUTES = [
       "/pricing/success", "/pricing/cancel", "/pricing", "/upgrade",
-      "/subscription/success", "/register", "/login", "/dashboard",
-      "/onboarding", "/quote-doctor",
+      "/subscription/success", "/register", "/login",
+      "/forgot-password", "/reset-password",
+      "/dashboard", "/onboarding", "/quote-doctor",
     ];
     for (const route of TOP_LEVEL_SPA_ROUTES) {
       app.get(route, (_req: Request, res: Response) => {
@@ -463,6 +480,30 @@ function configureExpoAndLanding(app: express.Application) {
       }
       next();
     });
+
+    // Generic SPA fallback: any GET that looks like a client route (no file
+    // extension) and isn't already handled by an API/backend route should
+    // serve the React app's index.html. This is what makes deep links from
+    // emails (e.g. /quotes/new) work without listing every route by hand.
+    // Skips: paths with a file extension (.js, .png, .map…), /api, /manifest,
+    // /healthz, /metrics, /webhooks, /oauth, /auth, /uploads, /assets, /static.
+    const NON_SPA_PREFIXES = [
+      "/api", "/manifest", "/healthz", "/metrics", "/webhooks",
+      "/oauth", "/auth/google", "/auth/apple", "/uploads", "/assets",
+      "/static", "/.well-known", "/sitemap", "/robots.txt",
+    ];
+    app.get(/.*/, (req: Request, res: Response, next: NextFunction) => {
+      const p = req.path;
+      if (NON_SPA_PREFIXES.some((prefix) => p === prefix || p.startsWith(prefix + "/") || p.startsWith(prefix))) {
+        return next();
+      }
+      // Skip requests for static assets (anything with a file extension)
+      if (/\.[a-zA-Z0-9]{1,6}$/.test(p)) return next();
+      const indexPath = path.join(webDistPath, "index.html");
+      if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+      return next();
+    });
+
     log("Web app: serving from /app");
   }
 
@@ -574,9 +615,266 @@ async function seedToDoDemo() {
 
   configureExpoAndLanding(app);
 
+  // BOOT: ensure connect-pg-simple's session table exists BEFORE any
+  // session middleware is registered. Avoids cold-start race that
+  // produced "relation \"session\" does not exist" 500s during deploy.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+      ) WITH (OIDS=FALSE);
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");`);
+    console.log("[boot-session] session table ensured");
+  } catch (err: any) {
+    console.error("[boot-session] Failed:", err.message);
+  }
+
+  // BOOT: ensure intake_requests table exists. Lead-capture / Lead Link
+  // microsite writes here via raw SQL; without it, every customer
+  // submission 500s and nothing shows in the operator portal.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS intake_requests (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        business_id varchar NOT NULL,
+        customer_name text NOT NULL DEFAULT '',
+        customer_email text NOT NULL DEFAULT '',
+        customer_phone text NOT NULL DEFAULT '',
+        customer_address text NOT NULL DEFAULT '',
+        raw_text text,
+        extracted_fields jsonb NOT NULL DEFAULT '{}'::jsonb,
+        source text NOT NULL DEFAULT 'intake_form',
+        status text NOT NULL DEFAULT 'pending',
+        confidence text NOT NULL DEFAULT 'low',
+        missing_field_flags jsonb NOT NULL DEFAULT '[]'::jsonb,
+        review_notes text NOT NULL DEFAULT '',
+        follow_up_sent boolean NOT NULL DEFAULT false,
+        converted_quote_id uuid,
+        autopilot_enrolled boolean NOT NULL DEFAULT false,
+        autopilot_enrolled_at timestamptz,
+        autopilot_status text,
+        autopilot_error text,
+        autopilot_quote_sent_at timestamptz,
+        quote_generated_at timestamptz,
+        quote_email_sent_at timestamptz,
+        reviewed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT NOW(),
+        updated_at timestamptz NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_intake_requests_business_status ON intake_requests (business_id, status, created_at DESC);`);
+    console.log("[boot-intake] intake_requests table ensured");
+
+    // BACKFILL: copy any /request-flow leads (table: leads) into
+    // intake_requests so they appear in the operator portal. Idempotent —
+    // dedups on (business_id, customer_email, source, created_at).
+    try {
+      const bf = await pool.query(`
+        INSERT INTO intake_requests
+          (business_id, customer_name, customer_email, customer_phone, customer_address,
+           extracted_fields, source, status, confidence, created_at)
+        SELECT
+          b.id,
+          TRIM(CONCAT_WS(' ', l.contact->>'firstName', l.contact->>'lastName')),
+          COALESCE(l.contact->>'email', ''),
+          COALESCE(l.contact->>'phone', ''),
+          TRIM(BOTH ', ' FROM CONCAT_WS(', ',
+            NULLIF(l.contact->>'street',''),
+            NULLIF(l.contact->>'apt',''),
+            NULLIF(l.contact->>'city',''),
+            NULLIF(l.contact->>'state',''),
+            NULLIF(l.contact->>'zip',''))),
+          jsonb_build_object('contact', l.contact, 'home', l.home, 'preferences', l.preferences, 'leadId', l.id),
+          'instant_quote_request',
+          'pending',
+          'high',
+          l.created_at
+        FROM leads l
+        JOIN businesses b ON b.public_quote_slug = l.business_slug
+        WHERE NOT EXISTS (
+          SELECT 1 FROM intake_requests ir
+          WHERE ir.business_id = b.id
+            AND ir.source = 'instant_quote_request'
+            AND ir.customer_email = COALESCE(l.contact->>'email', '')
+            AND ir.created_at = l.created_at
+        );
+      `);
+      if ((bf.rowCount ?? 0) > 0) {
+        console.log(`[boot-intake] Backfilled ${bf.rowCount} legacy lead(s) from leads → intake_requests`);
+      }
+    } catch (bfErr: any) {
+      console.warn("[boot-intake] Backfill skipped:", bfErr.message);
+    }
+  } catch (err: any) {
+    console.error("[boot-intake] Failed:", err.message);
+  }
+
   const server = await registerRoutes(app);
 
   setupErrorHandler(app);
+
+  // ─── Sales Tax + Convenience Fee schema additions ────────────────────────────
+  // Phase 3 of the tax/fees feature. Adds columns to quotes / customers /
+  // businesses / business_locations. Idempotent — safe to run every boot.
+  // Existing rows inherit column defaults (tax_rate=0, fee=null), so legacy
+  // quotes display unchanged with no manual backfill needed.
+  try {
+    await pool.query(`
+      ALTER TABLE quotes
+        ADD COLUMN IF NOT EXISTS tax_rate              real         NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS tax_label             text         NOT NULL DEFAULT 'Sales Tax',
+        ADD COLUMN IF NOT EXISTS tax_applies_to        text         NOT NULL DEFAULT 'subtotal',
+        ADD COLUMN IF NOT EXISTS convenience_fee_type  text,
+        ADD COLUMN IF NOT EXISTS convenience_fee_value real,
+        ADD COLUMN IF NOT EXISTS convenience_fee_amount real        NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS convenience_fee_label text         NOT NULL DEFAULT 'Convenience Fee';
+    `);
+    await pool.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS is_tax_exempt     boolean NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS tax_exempt_reason text    NOT NULL DEFAULT '';
+    `);
+    await pool.query(`
+      ALTER TABLE businesses
+        ADD COLUMN IF NOT EXISTS tax_fees_settings jsonb;
+    `);
+    await pool.query(`
+      ALTER TABLE business_locations
+        ADD COLUMN IF NOT EXISTS tax_rate real;
+    `);
+    console.log("[boot-tax-fees] tax/fees columns ensured");
+  } catch (err: any) {
+    console.error("[boot-tax-fees] Failed:", err.message);
+  }
+
+  // ─── Duplicate-subscription detector ─────────────────────────────────────
+  // Defense-in-depth: scan Stripe daily for any customer holding more than
+  // one live (active/trialing/past_due/unpaid) subscription. Each duplicate
+  // is a billing risk — when trials end the customer gets charged Nx the
+  // plan price. We log them and email MIKE_ALERTS_EMAIL so a slipped code
+  // path is caught within 24h instead of months.
+  const runDupSubDetector = async () => {
+    try {
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const { sendEmail, MIKE_ALERTS_EMAIL } = await import("./mail");
+      const stripe = await getUncachableStripeClient();
+      const LIVE = new Set(["active", "trialing", "past_due", "unpaid"]);
+      const byCust: Record<string, any[]> = {};
+      let starting_after: string | undefined;
+      do {
+        const page: any = await stripe.subscriptions.list({
+          status: "all",
+          limit: 100,
+          starting_after,
+        });
+        for (const sub of page.data) {
+          if (!LIVE.has(sub.status)) continue;
+          const cid = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+          (byCust[cid] ||= []).push(sub);
+        }
+        starting_after = page.has_more ? page.data[page.data.length - 1].id : undefined;
+      } while (starting_after);
+      const dups = Object.entries(byCust).filter(([, v]) => v.length > 1);
+      if (dups.length === 0) {
+        console.log("[dup-sub-detector] clean — no customers with multiple live subs");
+        return;
+      }
+      const lines: string[] = [];
+      for (const [cid, subs] of dups) {
+        let email = "";
+        try {
+          const c: any = await stripe.customers.retrieve(cid);
+          email = c.email || c.name || "";
+        } catch {}
+        lines.push(`${cid} (${email}) — ${subs.length} live subs:`);
+        for (const s of subs.sort((a: any, b: any) => a.created - b.created)) {
+          const p = s.items.data[0]?.price;
+          lines.push(`  ${s.id} status=${s.status} $${(p?.unit_amount || 0) / 100}/${p?.recurring?.interval} created=${new Date(s.created * 1000).toISOString()}`);
+        }
+      }
+      const body = lines.join("\n");
+      console.error(`[dup-sub-detector] FOUND ${dups.length} customer(s) with duplicate live subs:\n${body}`);
+      try {
+        await sendEmail({
+          to: MIKE_ALERTS_EMAIL,
+          subject: `[QuotePro] ${dups.length} customer(s) with duplicate Stripe subscriptions`,
+          html: `<p>The duplicate-subscription detector found <b>${dups.length}</b> customer(s) with more than one live subscription. Each one is at risk of being billed Nx the plan price when trials end.</p><pre style="font-family:monospace;background:#f6f6f6;padding:12px;border-radius:6px;white-space:pre-wrap">${body.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c))}</pre>`,
+        });
+      } catch (e: any) {
+        console.error("[dup-sub-detector] email send failed:", e?.message || e);
+      }
+    } catch (err: any) {
+      console.error("[dup-sub-detector] Failed:", err?.message || err);
+    }
+  };
+  // Kick off ~60s after boot so we don't slow startup, then once per day.
+  setTimeout(runDupSubDetector, 60 * 1000);
+  setInterval(runDupSubDetector, 24 * 60 * 60 * 1000);
+  console.log("[dup-sub-detector] Scheduled (first run +60s, then daily)");
+
+  // ─── Backfill default business_locations ─────────────────────────────────
+  // For any business whose owner has no rows in business_locations, seed a
+  // "Main Location" using the business's existing companyName/address/phone/
+  // timezone. Mirrors the on-demand auto-seed in quotesRouter, but applied
+  // proactively so users never trip the no-location path. Idempotent: the
+  // SELECT excludes owners that already have at least one location, so it's
+  // a no-op on subsequent boots.
+  try {
+    const { rows } = await pool.query<{
+      owner_user_id: string;
+      company_name: string | null;
+      address: string | null;
+      phone: string | null;
+      timezone: string | null;
+    }>(`
+      SELECT DISTINCT ON (b.owner_user_id)
+        b.owner_user_id, b.company_name, b.address, b.phone, b.timezone
+        FROM businesses b
+        LEFT JOIN business_locations bl ON bl.owner_id = b.owner_user_id
+       WHERE bl.id IS NULL
+       ORDER BY b.owner_user_id, b.id
+    `);
+
+    let seeded = 0;
+    for (const r of rows) {
+      try {
+        const name = (r.company_name?.trim() || "Main Location");
+        const tz = (r.timezone?.trim() || "America/New_York");
+        const { rows: ins } = await pool.query<{ id: string }>(
+          `INSERT INTO business_locations
+             (owner_id, name, address, phone, timezone, active, is_primary)
+           VALUES ($1, $2, $3, $4, $5, true, true)
+           RETURNING id`,
+          [r.owner_user_id, name, r.address?.trim() || null, r.phone?.trim() || null, tz]
+        );
+        if (ins[0]?.id) {
+          await pool.query(
+            `UPDATE users
+                SET active_location_id = $1
+              WHERE id = $2 AND active_location_id IS NULL`,
+            [ins[0].id, r.owner_user_id]
+          );
+          seeded++;
+        }
+      } catch (rowErr: any) {
+        console.warn(
+          `[boot-seed-locations] failed for owner ${r.owner_user_id}:`,
+          rowErr?.message || rowErr
+        );
+      }
+    }
+    if (seeded > 0) {
+      console.log(`[boot-seed-locations] seeded default location for ${seeded} owner(s)`);
+    } else {
+      console.log("[boot-seed-locations] no owners missing a location");
+    }
+  } catch (err: any) {
+    console.error("[boot-seed-locations] Failed:", err.message);
+  }
 
   // ─── Distributed cron lock table ─────────────────────────────────────────────
   (async () => {
@@ -655,12 +953,19 @@ async function seedToDoDemo() {
     lockedPrune();
     setInterval(lockedPrune, 60 * 60 * 1000);
     console.log("[rate-limit-prune] Cron scheduled (hourly)");
+
+    // ONE-SHOT BOOT UNLOCK: clear any active login lockouts so anyone
+    // hitting "Too many attempts" recovers immediately on this deploy.
+    pool.query(`DELETE FROM rate_limit_counters WHERE key LIKE 'login-failure:%' OR key LIKE 'auth:%'`)
+      .then((r) => console.log(`[boot-unlock] Cleared ${r.rowCount ?? 0} login lockout row(s)`))
+      .catch((err) => console.error("[boot-unlock] Failed:", err.message));
   }).catch((e: any) => console.error("[rate-limit-prune] Failed to load store:", e.message));
 
   // ─── Auto-charge cron: runs every minute ─────────────────────────────────
   import("./cron/autoCharge").then(({ startAutoChargeCron }) => {
     startAutoChargeCron();
   }).catch((e: any) => console.error("[auto-charge] Failed to load cron:", e.message));
+
 
   // ─── Customer email sequence cron: fires every hour ─────────────────────
   import("./sequenceEmails").then(({ processSequenceQueue }) => {
@@ -782,6 +1087,11 @@ async function seedToDoDemo() {
   }
   scheduleOwnerRecaps();
   // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─── AI Concierge weekly digest (Mondays 9:00 UTC) ──────────────────────
+  import("./cron/conciergeDigest").then(({ startConciergeDigestCron }) => {
+    startConciergeDigestCron();
+  }).catch((e: any) => console.error("[concierge-digest] Failed to load cron:", e.message));
 
   // ─── Follow-up queue push: daily 8:30am, once per day if queue > 0 ────────
   function scheduleFollowUpQueuePushCron() {
@@ -997,13 +1307,13 @@ async function seedToDoDemo() {
   scheduleSentQuoteFollowUpCron();
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // ─── Draft quote nudge: Mondays at 7am ───────────────────────────────────
-  // Emails business owners who have draft quotes > 2 days old.
+  // ─── Draft quote nudge: daily at 9am local ───────────────────────────────
+  // Emails business owners who have draft quotes > 4 hours old.
+  // Per-owner cooldown of 3 days is enforced inside processDraftQuoteNudges.
   function scheduleDraftQuoteNudgeCron() {
     setInterval(async () => {
       const d = new Date();
-      if (d.getDay() !== 1) return;          // Monday only
-      if (d.getHours() !== 7 || d.getMinutes() > 30) return;
+      if (d.getHours() !== 9 || d.getMinutes() > 30) return;
       try {
         await processDraftQuoteNudges();
       } catch (e: any) {
@@ -1356,7 +1666,7 @@ async function seedToDoDemo() {
 
     async function runAllNightlyCrons() {
       console.log("[nightly] Starting nightly crons (trial expiry + Stripe reconciliation)");
-      await runTrialExpiryDowngrade();
+      // Paid access is provider-verified; never grant Starter after a trial expires.
       await runStripeReconciliation();
       console.log("[nightly] Nightly crons complete");
     }
@@ -1384,6 +1694,12 @@ async function seedToDoDemo() {
     },
     () => {
       log(`express server serving on port ${port}`);
+      // Phase 1 RBAC: non-blocking sanity check that the legacy
+      // businesses.owner_user_id column and business_members(role='owner')
+      // are still in sync. Logs a warning if drift is detected.
+      import("./lib/membership")
+        .then((m) => m.checkOwnershipDrift())
+        .catch((e) => console.warn("[rbac] drift check failed:", e?.message));
     },
   );
 })();

@@ -4,7 +4,12 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["shared/**/*.test.ts", "server/**/*.test.ts", "tests/**/*.test.ts"],
+    include: [
+      "shared/**/*.test.ts",
+      "server/**/*.test.ts",
+      "tests/**/*.test.ts",
+      "web/src/**/*.test.ts",
+    ],
     coverage: {
       provider: "v8",
       include: ["shared/pricingEngine.ts"],
@@ -17,6 +22,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@shared": path.resolve(__dirname, "shared"),
+      shared: path.resolve(__dirname, "shared"),
     },
   },
 });

@@ -26,6 +26,7 @@ import CustomerInfoScreen from "@/screens/quote/CustomerInfoScreen";
 import HomeDetailsScreen from "@/screens/quote/HomeDetailsScreen";
 import ServiceAddOnsScreen from "@/screens/quote/ServiceAddOnsScreen";
 import QuotePreviewScreen from "@/screens/quote/QuotePreviewScreen";
+import PaywallScreen from "@/screens/PaywallScreen";
 import { FeatureFlags } from "@/lib/featureFlags";
 import { trackEvent } from "@/lib/analytics";
 
@@ -42,7 +43,7 @@ export default function QuoteCalculatorScreen() {
   const useMaxWidth = screenWidth > 600;
   const { pricingSettings, businessProfile } = useApp();
   const { user, isGuest } = useAuth();
-  const { isPro, isGrowth, isStarter } = useSubscription();
+  const { isPro, isGrowth, isStarter, isLoading: subscriptionLoading } = useSubscription();
   const queryClient = useQueryClient();
 
   const { data: quoteCountData } = useQuery<{ count: number; limit: number | null }>({
@@ -451,7 +452,7 @@ export default function QuoteCalculatorScreen() {
           What are you quoting?
         </ThemedText>
 
-        {isStarter && !isGrowth && quoteCountData ? (
+        {isStarter && !isGrowth && quoteCountData && quoteCountData.limit !== null ? (
           <Pressable
             onPress={() => navigation.navigate("Paywall", { required_tier: "growth", trigger_source: "quote_limit" } as any)}
             style={[
@@ -633,6 +634,9 @@ export default function QuoteCalculatorScreen() {
         return null;
     }
   };
+
+  if (subscriptionLoading) return <View style={styles.container}><ThemedText>Checking subscription…</ThemedText></View>;
+  if (!isStarter) return <PaywallScreen />;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>

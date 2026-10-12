@@ -1,9 +1,16 @@
 import { Router, Request, Response } from "express";
-import { sendEmail, PLATFORM_FROM_NAME } from "../mail";
+import { sendEmail, PLATFORM_FROM_NAME, MIKE_ALERTS_EMAIL } from "../mail";
 
 export const supportRouter = Router();
 
-const SUPPORT_EMAIL = "mike@getquotepro.ai";
+// Primary inbox is mike@getquotepro.ai (Zoho-hosted). Zoho's DMARC policy
+// rejects mail from SendGrid claiming to be FROM the same domain (553/554
+// "policy violation"), so the same-domain copy bounces. We always include
+// MIKE_ALERTS_EMAIL (a personal Gmail) as a guaranteed-delivery secondary
+// recipient. Zoho copy still attempts and will succeed once DMARC alignment
+// is fixed at the DNS level.
+const SUPPORT_EMAIL_PRIMARY = "mike@getquotepro.ai";
+const SUPPORT_RECIPIENTS = [MIKE_ALERTS_EMAIL, SUPPORT_EMAIL_PRIMARY];
 
 const TIER_LABELS: Record<string, string> = {
   free: "Free Trial",
@@ -104,7 +111,7 @@ supportRouter.post("/ticket", async (req: Request, res: Response) => {
     // Send both emails (don't block on either)
     await Promise.all([
       sendEmail({
-        to: SUPPORT_EMAIL,
+        to: SUPPORT_RECIPIENTS,
         subject: `[Support] ${name} — ${tierLabel} — ${ticketId}`,
         html: adminHtml,
         replyTo: email,
@@ -115,7 +122,7 @@ supportRouter.post("/ticket", async (req: Request, res: Response) => {
         subject: `We got your message — Ticket ${ticketId}`,
         html: userHtml,
         fromName: PLATFORM_FROM_NAME,
-        replyTo: SUPPORT_EMAIL,
+        replyTo: SUPPORT_EMAIL_PRIMARY,
       }),
     ]);
 

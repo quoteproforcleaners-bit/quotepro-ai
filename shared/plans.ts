@@ -8,7 +8,7 @@
 export type PlanTier = "free" | "starter" | "growth" | "pro";
 export type BillingInterval = "monthly" | "annual";
 
-export const FREE_TRIAL_DAYS = 14;
+export const FREE_TRIAL_DAYS = 0;
 
 // ─── Plan metadata ────────────────────────────────────────────────────────────
 
@@ -23,20 +23,20 @@ export const PLAN_META: Record<PlanTier, {
     label: "Free",
     monthlyPrice: null,
     annualMonthlyPrice: null,
-    quotesPerMonth: 3,
+    quotesPerMonth: 0,
     aiFollowUpsPerMonth: 0,
   },
   starter: {
-    label: "Starter",
-    monthlyPrice: 19,
-    annualMonthlyPrice: 19,
-    quotesPerMonth: 20,
-    aiFollowUpsPerMonth: 3,
+    label: "Basic",
+    monthlyPrice: null,
+    annualMonthlyPrice: null,
+    quotesPerMonth: Infinity,
+    aiFollowUpsPerMonth: 0,
   },
   growth: {
-    label: "Growth",
-    monthlyPrice: 49,
-    annualMonthlyPrice: 41,
+    label: "AI",
+    monthlyPrice: null,
+    annualMonthlyPrice: null,
     quotesPerMonth: Infinity,
     aiFollowUpsPerMonth: Infinity,
   },
@@ -73,13 +73,11 @@ export function getQuoteCap(
 ): number {
   if (isGrowthOrAbove(tier)) return Infinity;
   if (tier === "starter") return PLAN_META.starter.quotesPerMonth;
-  return isInFreeTrial ? PLAN_META.starter.quotesPerMonth : PLAN_META.free.quotesPerMonth;
+  return PLAN_META.free.quotesPerMonth;
 }
 
 /** Format a price for display ("$49/mo", "Free", etc.) */
 export function formatPlanPrice(tier: PlanTier, interval: BillingInterval = "monthly"): string {
-  const meta = PLAN_META[tier];
-  if (meta.monthlyPrice === null) return "Free";
-  const price = interval === "annual" ? meta.annualMonthlyPrice! : meta.monthlyPrice;
-  return `$${price}/mo`;
+  if (tier === "free") return "Subscription required";
+  return tier === "starter" ? "Basic · weekly" : tier === "growth" ? "AI · weekly" : "Legacy Pro";
 }

@@ -78,6 +78,11 @@ export const users = pgTable("users", {
   activationNudge70hSent: boolean("activation_nudge_70h_sent").notNull().default(false),
   smsOptedOut: boolean("sms_opted_out").notNull().default(false),
   hasCompletedFirstQuote: boolean("has_completed_first_quote").notNull().default(false),
+  // AI Concierge widget owner settings (guardrails, personality, suggested prompt overrides, lang prefs)
+  aiWidgetSettings: jsonb("ai_widget_settings").default(sql`'{}'::jsonb`),
+  // T208: Pro-tier API key (sha256 hash; raw key shown to user only once on rotation)
+  apiKeyHash: text("api_key_hash"),
+  apiKeyCreatedAt: timestamp("api_key_created_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -127,6 +132,22 @@ export const businesses = pgTable("businesses", {
   bookingWidgetStartTime: text("booking_widget_start_time").notNull().default("08:00"),
   bookingWidgetEndTime: text("booking_widget_end_time").notNull().default("18:00"),
   bookingWidgetAdvanceNoticeHours: integer("booking_widget_advance_notice_hours").notNull().default(24),
+  chatWidgetEnabled: boolean("chat_widget_enabled").notNull().default(true),
+  chatWidgetColor: text("chat_widget_color"),
+  publicQuoteSlug: text("public_quote_slug").unique(),
+  publicQuoteEnabled: boolean("public_quote_enabled").notNull().default(true),
+  publicQuoteButtonText: text("public_quote_button_text").notNull().default("Get a Free Quote"),
+  intakeCode: text("intake_code").unique(),
+  leadLinkGuideSentAt: timestamp("lead_link_guide_sent_at"),
+  // Account-level Sales Tax + Convenience Fee defaults. JSONB shape:
+  // {
+  //   tax: { enabled: bool, rate: number (0.0875), label: string,
+  //          appliesTo: 'subtotal' | 'subtotal_plus_fee' },
+  //   fee: { enabled: bool, type: 'flat' | 'percentage', value: number,
+  //          label: string, appliesTo: 'all' | 'card_only',
+  //          helperText: string }
+  // }
+  taxFeesSettings: jsonb("tax_fees_settings"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -165,6 +186,11 @@ export const customers = pgTable("customers", {
   smsOptOut: boolean("sms_opt_out").notNull().default(false),
   isVip: boolean("is_vip").notNull().default(false),
   preferredLanguage: varchar("preferred_language", { length: 10 }),
+  // Tax-exempt customers (nonprofits, government, churches). When true,
+  // no sales tax is applied to this customer's quotes regardless of the
+  // business default.
+  isTaxExempt: boolean("is_tax_exempt").notNull().default(false),
+  taxExemptReason: text("tax_exempt_reason").notNull().default(""),
   importedAt: timestamp("imported_at"),
   deletedAt: timestamp("deleted_at"),
   // Stripe Connect (customer payment methods on connected account)
@@ -186,6 +212,12 @@ export const quotes = pgTable("quotes", {
   businessId: varchar("business_id")
     .notNull()
     .references(() => businesses.id),
+  // NOT NULL is enforced at the application layer in createQuote (auto-falls
+  // back to the owner's active_location_id if missing). The DB constraint
+  // was removed because production has legacy quotes with NULL location_id
+  // from before this column existed, and Replit's publish flow only diffs
+  // schema (not data) — so SET NOT NULL on prod fails. Backfill prod NULLs
+  // separately if/when needed; new quotes can never be NULL.
   locationId: varchar("location_id"),
   customerId: varchar("customer_id")
     .references(() => customers.id),
@@ -200,6 +232,16 @@ export const quotes = pgTable("quotes", {
   subtotal: real("subtotal").notNull().default(0),
   tax: real("tax").notNull().default(0),
   total: real("total").notNull().default(0),
+  // ─── Sales Tax + Convenience Fee (snapshot at send time) ─────────────
+  // Snapshot the rate and labels at send time so changing settings later
+  // doesn't retroactively alter sent quotes.
+  taxRate: real("tax_rate").notNull().default(0),
+  taxLabel: text("tax_label").notNull().default("Sales Tax"),
+  taxAppliesTo: text("tax_applies_to").notNull().default("subtotal"),
+  convenienceFeeType: text("convenience_fee_type"),
+  convenienceFeeValue: real("convenience_fee_value"),
+  convenienceFeeAmount: real("convenience_fee_amount").notNull().default(0),
+  convenienceFeeLabel: text("convenience_fee_label").notNull().default("Convenience Fee"),
   status: text("status").notNull().default("draft"),
   sentVia: text("sent_via"),
   sentAt: timestamp("sent_at"),
@@ -235,6 +277,15 @@ export const quotes = pgTable("quotes", {
   stripeInvoiceStatus: text("stripe_invoice_status"),
   stripeInvoiceSentAt: timestamp("stripe_invoice_sent_at"),
   source: text("source").default("manual"),
+  // Snapshot of the assigned location at send time (name/address/phone/etc).
+  // Public quote view reads from here so post-send edits to the location
+  // record do not change historical quotes.
+  locationSnapshot: jsonb("location_snapshot"),
+  // AI Concierge widget per-quote settings
+  aiWidgetEnabled: boolean("ai_widget_enabled").notNull().default(true),
+  aiWidgetPersonality: text("ai_widget_personality").notNull().default("concierge"),
+  // Service type (data-driven; null = legacy residential tiered)
+  serviceTypeId: varchar("service_type_id").references((): any => serviceTypes.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -242,6 +293,7 @@ export const quotes = pgTable("quotes", {
   statusIdx:     index("quotes_status_idx").on(table.status),
   createdAtIdx:  index("quotes_created_at_idx").on(table.createdAt),
   deletedAtIdx:  index("quotes_deleted_at_idx").on(table.deletedAt),
+  serviceTypeIdx: index("quotes_service_type_idx").on(table.serviceTypeId),
 }));
 
 export const salesRecommendations = pgTable("sales_recommendations", {
@@ -1522,6 +1574,9 @@ export const businessLocations = pgTable("business_locations", {
   timezone: text("timezone").notNull().default("America/New_York"),
   active: boolean("active").notNull().default(true),
   isPrimary: boolean("is_primary").notNull().default(false),
+  // Per-location sales tax rate override. NULL = inherit business default.
+  // Stored as decimal (e.g. 0.0875 = 8.75%).
+  taxRate: real("tax_rate"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1695,3 +1750,158 @@ export const gbpLeads = pgTable("gbp_leads", {
   processedAt: timestamp("processed_at").defaultNow(),
   quoteId: varchar("quote_id"),
 });
+
+/* ─── AI Concierge Widget tables ────────────────────────────────────────── */
+
+export const quoteAiConversations = pgTable("quote_ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  customerSessionId: text("customer_session_id").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  detectedLanguage: text("detected_language").notNull().default("en"),
+  totalMessages: integer("total_messages").notNull().default(0),
+  resultedInAcceptance: boolean("resulted_in_acceptance").notNull().default(false),
+  resultedInNegotiation: boolean("resulted_in_negotiation").notNull().default(false),
+  finalNegotiatedTotal: numeric("final_negotiated_total"),
+}, (table) => ({
+  quoteIdIdx: index("quote_ai_conv_quote_id_idx").on(table.quoteId),
+  sessionUniq: uniqueIndex("quote_ai_conv_session_uniq_idx").on(table.quoteId, table.customerSessionId),
+}));
+
+export const quoteAiMessages = pgTable("quote_ai_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => quoteAiConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // 'user' | 'assistant' | 'system'
+  content: text("content").notNull(),
+  contentType: text("content_type").notNull().default("text"), // 'text' | 'checklist' | 'comparison' | 'recalculated_quote' | 'image'
+  structuredPayload: jsonb("structured_payload"),
+  inputMethod: text("input_method").default("text"), // 'text' | 'suggested_prompt' | 'proactive_nudge'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  convIdx: index("quote_ai_msg_conv_idx").on(table.conversationId, table.createdAt),
+}));
+
+export const quoteNegotiationGuardrails = pgTable("quote_negotiation_guardrails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  minMarginPercent: numeric("min_margin_percent").notNull().default("35"),
+  maxDiscountPercent: numeric("max_discount_percent").notNull().default("15"),
+  removableAddons: jsonb("removable_addons").notNull().default(sql`'[]'::jsonb`),
+  nonNegotiableItems: jsonb("non_negotiable_items").notNull().default(sql`'[]'::jsonb`),
+  autoApproveThreshold: numeric("auto_approve_threshold").notNull().default("5"),
+  requiresOwnerApprovalAbove: numeric("requires_owner_approval_above").notNull().default("15"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: uniqueIndex("quote_neg_guard_user_idx").on(table.userId),
+}));
+
+export const quoteAiIntentSignals = pgTable("quote_ai_intent_signals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  quoteId: varchar("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  signalType: text("signal_type").notNull(), // 'price_sensitivity' | 'pet_concern' | 'availability' | 'guarantee' | 'comparison' | 'addon_interest' | 'objection'
+  signalDetail: text("signal_detail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("quote_ai_intent_user_idx").on(table.userId, table.createdAt),
+  quoteIdx: index("quote_ai_intent_quote_idx").on(table.quoteId),
+}));
+
+export const quoteAiProactiveEvents = pgTable("quote_ai_proactive_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => quoteAiConversations.id, { onDelete: "cascade" }),
+  triggerType: text("trigger_type").notNull(), // 'idle_90s' | 'scroll_past_price' | 'tier_toggle' | 'page_revisit' | 'mobile_zoom_pricing'
+  nudgeShown: text("nudge_shown"),
+  customerEngaged: boolean("customer_engaged").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  convIdx: index("quote_ai_proactive_conv_idx").on(table.conversationId),
+}));
+
+export type QuoteAiConversation = typeof quoteAiConversations.$inferSelect;
+export type QuoteAiMessage = typeof quoteAiMessages.$inferSelect;
+export type QuoteNegotiationGuardrails = typeof quoteNegotiationGuardrails.$inferSelect;
+export type QuoteAiIntentSignal = typeof quoteAiIntentSignals.$inferSelect;
+export type QuoteAiProactiveEvent = typeof quoteAiProactiveEvents.$inferSelect;
+
+// ─── Service Types (data-driven) ────────────────────────────────────────────
+// One row per (business, type_key). type_key is from a fixed enum-style list:
+//   residential_recurring | deep_clean | move_in_out | post_construction | airbnb | commercial
+// pricing_model: 'tiered' (Good/Better/Best) or 'flat' (single price).
+// pricing_config (jsonb) shape varies by model:
+//   tiered: { multipliers: { good, better, best }, ...uses business pricingSettings }
+//   flat:   { basePrice: number, perSqft?: number, perBedroom?: number, perBathroom?: number, minimum?: number }
+export const serviceTypes = pgTable("service_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
+  typeKey: text("type_key").notNull(),
+  displayName: text("display_name").notNull(),
+  pricingModel: text("pricing_model").notNull().default("flat"),
+  pricingConfig: jsonb("pricing_config").notNull().default(sql`'{}'::jsonb`),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  bizIdx: index("service_types_biz_idx").on(table.businessId),
+  bizKeyUniq: uniqueIndex("service_types_biz_key_uniq").on(table.businessId, table.typeKey),
+}));
+
+export type ServiceType = typeof serviceTypes.$inferSelect;
+export type InsertServiceType = typeof serviceTypes.$inferInsert;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RBAC: business_members + user_invitations (Phase 1 of multi-user RBAC)
+// `businesses` IS the workspace/tenant; these tables add a memberships layer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const businessMembers = pgTable("business_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // 'owner' | 'admin' | 'manager' | 'estimator' | 'cleaner'
+  role: text("role").notNull().default("cleaner"),
+  // 'pending' | 'active' | 'disabled'
+  status: text("status").notNull().default("active"),
+  invitedByUserId: varchar("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  invitedAt: timestamp("invited_at"),
+  acceptedAt: timestamp("accepted_at"),
+  lastActiveAt: timestamp("last_active_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  bizUserUniq: uniqueIndex("business_members_biz_user_uniq").on(table.businessId, table.userId),
+  byUser: index("business_members_user_idx").on(table.userId),
+  byBiz: index("business_members_biz_idx").on(table.businessId),
+}));
+
+export type BusinessMember = typeof businessMembers.$inferSelect;
+export type InsertBusinessMember = typeof businessMembers.$inferInsert;
+
+export const userInvitations = pgTable("user_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id")
+    .notNull()
+    .references(() => businesses.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role").notNull(),
+  // sha256 of the raw token. Raw token is only ever in the email link.
+  tokenHash: text("token_hash").notNull(),
+  invitedByUserId: varchar("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tokenUniq: uniqueIndex("user_invitations_token_hash_uniq").on(table.tokenHash),
+  byBizEmail: index("user_invitations_biz_email_idx").on(table.businessId, table.email),
+}));
+
+export type UserInvitation = typeof userInvitations.$inferSelect;
+export type InsertUserInvitation = typeof userInvitations.$inferInsert;

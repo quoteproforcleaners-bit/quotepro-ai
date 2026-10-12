@@ -8,6 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -156,6 +157,7 @@ export default function QuoteDoctorScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const navigation = useNavigation<any>();
   const { isGrowth, tier } = useSubscription();
 
   // Mode
@@ -444,7 +446,7 @@ export default function QuoteDoctorScreen() {
                       Quote Doctor's AI Pricing Check is available on the Growth plan and above.
                     </Text>
                     <TouchableOpacity
-                      onPress={() => Linking.openURL("https://getquotepro.ai/upgrade")}
+                      onPress={() => navigation.navigate("Paywall", { trigger_source: "quote_doctor_gate", required_tier: "growth" })}
                       activeOpacity={0.88}
                       style={styles.gateBtn}
                       testID="button-upgrade-growth"

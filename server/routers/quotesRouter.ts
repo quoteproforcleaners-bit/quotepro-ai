@@ -40,7 +40,7 @@ import {
   getBusinessByOwner, createBusiness, updateBusiness,
   getPricingByBusiness, upsertPricingSettings,
   getCustomersByBusiness, getCustomerById, createCustomer, updateCustomer, deleteCustomer,
-  getQuotesWithCustomersByBusiness, getQuotesByBusiness, getQuoteCountThisMonth, getQuoteById, getQuoteByToken, createQuote, updateQuote,
+  getQuotesWithCustomersByBusiness, getQuotesByBusiness, getQuoteCountThisMonth, getQuoteById, getQuoteByToken, createQuote, updateQuote, ensureQuoteLocationSnapshot,
   deleteQuote as deleteQuoteRow,
   getLineItemsByQuote, createLineItem, deleteLineItemsByQuote,
   getJobsByBusiness, getJobById, createJob, updateJob, deleteJob,
@@ -93,8 +93,8 @@ const router = Router();
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
-      const { status, customerId } = req.query as any;
-      const enriched = await getQuotesWithCustomersByBusiness(business.id, { status, customerId });
+      const { status, customerId, locationId } = req.query as any;
+      const enriched = await getQuotesWithCustomersByBusiness(business.id, { status, customerId, locationId });
       return res.json(enriched);
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get quotes" });
@@ -132,13 +132,13 @@ const router = Router();
       if (!business) return res.status(404).json({ message: "Business not found" });
       const user = await getUserById(req.session.userId!);
       const tier = user?.subscriptionTier || "free";
-      const isPaid = isGrowthOrAbove(tier);
+      const isPaid = tier !== "free";
       const isStarter = tier === "starter";
-      const FREE_TRIAL_DAYS = 14;
+      const FREE_TRIAL_DAYS = 0;
       const trialRef = (user as any)?.trialStartedAt ?? user?.createdAt;
       const userAgeDays = trialRef ? Math.floor((Date.now() - new Date(trialRef).getTime()) / 86_400_000) : 999;
       const isInFreeTrial = tier === "free" && userAgeDays < FREE_TRIAL_DAYS;
-      const limit = isStarter ? 20 : (isPaid ? Infinity : (isInFreeTrial ? 20 : 3));
+      const limit = isPaid ? Infinity : 0;
       // Quota counts quotes from the CURRENT calendar month, not lifetime.
       const quoteCount = isPaid ? 0 : await getQuoteCountThisMonth(business.id);
       return res.json({ count: quoteCount, limit: limit === Infinity ? null : limit, isPro: isPaid, isInFreeTrial });
@@ -223,30 +223,27 @@ const router = Router();
 
   router.post("/quotes", requireAuth, async (req: Request, res: Response) => {
     try {
+      console.log("[create-quote] entry", { userId: req.session.userId, hasBody: !!req.body, serviceTypeId: req.body?.serviceTypeId, locationId: req.body?.locationId, customerId: req.body?.customerId });
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
 
       const user = await getUserById(req.session.userId!);
-      if (user && !isGrowthOrAbove(user.subscriptionTier)) {
+      if (!user || user.subscriptionTier === "free") {
         // Count quotes from the CURRENT calendar month — Starter's "20/mo"
         // cap resets on the 1st instead of being a lifetime cap.
         const quoteCount = await getQuoteCountThisMonth(business.id);
-        const FREE_TRIAL_DAYS = 14;
+        const FREE_TRIAL_DAYS = 0;
         // Use trialStartedAt if available, fall back to createdAt
-        const trialRef = (user as any).trialStartedAt ?? user.createdAt;
+        const trialRef = (user as any)?.trialStartedAt ?? user?.createdAt;
         const userAgeDays = trialRef
           ? Math.floor((Date.now() - new Date(trialRef).getTime()) / 86_400_000)
           : 999;
-        const isInFreeTrial = user.subscriptionTier === "free" && userAgeDays < FREE_TRIAL_DAYS;
-        const quoteCap = user.subscriptionTier === "starter" ? 20 : (isInFreeTrial ? 20 : 3);
+        const isInFreeTrial = false;
+        const quoteCap = 0;
         if (quoteCount >= quoteCap) {
-          trackEvent(req.session.userId!, AnalyticsEvents.QUOTE_QUOTA_HIT, { quoteCap, tier: user.subscriptionTier }).catch(() => {});
+          trackEvent(req.session.userId!, AnalyticsEvents.QUOTE_QUOTA_HIT, { quoteCap, tier: user?.subscriptionTier }).catch(() => {});
           return res.status(403).json({
-            message: user.subscriptionTier === "starter"
-              ? `You've reached your ${quoteCap} quote monthly limit. Upgrade to Growth for unlimited quotes.`
-              : isInFreeTrial
-              ? `You've used all ${quoteCap} trial quotes. Upgrade to continue quoting.`
-              : `You've used ${quoteCap} of ${quoteCap} free quotes. Upgrade to Growth for unlimited quotes.`,
+            message: "A paid subscription is required to create quotes.",
             quoteLimitReached: true,
           });
         }
@@ -261,7 +258,143 @@ const router = Router();
         expiresAt.setDate(expiresAt.getDate() + expirationDays);
       }
 
-      const q = await createQuote({ ...req.body, businessId: business.id, expiresAt });
+      // Service Types (Option B): validate serviceTypeId belongs to this business
+      // and is active. Rejects spoofed or cross-tenant IDs.
+      let validatedServiceTypeId: string | null = null;
+      if (req.body.serviceTypeId) {
+        const { getServiceType } = await import("../services/serviceTypesService");
+        const st = await getServiceType(business.id, String(req.body.serviceTypeId));
+        if (!st) {
+          return res.status(400).json({ message: "Invalid serviceTypeId for this business." });
+        }
+        if (!st.isActive) {
+          return res.status(400).json({ message: "That service type is not currently active." });
+        }
+        validatedServiceTypeId = st.id;
+      }
+
+      // Location: required. Verify the requested location belongs to the
+      // current business. Fall back to the user's active location (resolved
+      // by the locationContext middleware) when the client omits it. This
+      // keeps single-location accounts and legacy clients working, and stays
+      // correct for non-owner roles (members) who don't own the location row.
+      let validatedLocationId: string | null = null;
+      const requestedLocationId = req.body.locationId ? String(req.body.locationId) : null;
+      if (requestedLocationId) {
+        const { rows } = await pool.query<{ id: string }>(
+          "SELECT id FROM business_locations WHERE id = $1 AND owner_id = $2",
+          [requestedLocationId, business.ownerUserId]
+        );
+        if (!rows[0]) {
+          return res.status(400).json({ message: "Invalid locationId for this account." });
+        }
+        validatedLocationId = rows[0].id;
+      } else if (req.activeLocationId) {
+        validatedLocationId = req.activeLocationId;
+      } else {
+        // Last-ditch fallback: business's primary (else oldest) location.
+        const { rows } = await pool.query<{ id: string }>(
+          `SELECT id FROM business_locations
+            WHERE owner_id = $1
+            ORDER BY is_primary DESC, created_at ASC
+            LIMIT 1`,
+          [business.ownerUserId]
+        );
+        validatedLocationId = rows[0]?.id ?? null;
+      }
+
+      // Auto-seed a default location if the account has none yet. New users
+      // shouldn't get bricked on their first quote by a settings page they've
+      // never seen. Pull defaults from the business profile so the seeded
+      // location reflects what they've already filled in.
+      //
+      // Race guard: parallel quote-creates (e.g. double-tap on the submit
+      // button) could each pass the no-location check and produce duplicate
+      // "Main Location" rows. Take a Postgres transaction-scoped advisory
+      // lock keyed on a stable hash of the owner id and re-check inside the
+      // critical section.
+      if (!validatedLocationId) {
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query(
+            "SELECT pg_advisory_xact_lock(hashtext('seed-location:' || $1))",
+            [business.ownerUserId]
+          );
+
+          // Re-check after acquiring the lock — another concurrent request
+          // may have already seeded.
+          const { rows: recheck } = await client.query<{ id: string }>(
+            `SELECT id FROM business_locations
+              WHERE owner_id = $1
+              ORDER BY is_primary DESC, created_at ASC
+              LIMIT 1`,
+            [business.ownerUserId]
+          );
+          if (recheck[0]) {
+            validatedLocationId = recheck[0].id;
+          } else {
+            const { rows: bizRows } = await client.query<{
+              company_name: string | null;
+              address: string | null;
+              phone: string | null;
+              timezone: string | null;
+            }>(
+              `SELECT company_name, address, phone, timezone
+                 FROM businesses
+                WHERE id = $1
+                LIMIT 1`,
+              [business.id]
+            );
+            const biz = bizRows[0];
+            const seedName = (biz?.company_name?.trim() || "Main Location");
+            const seedAddress = biz?.address?.trim() || null;
+            const seedPhone = biz?.phone?.trim() || null;
+            const seedTz = biz?.timezone?.trim() || "America/New_York";
+
+            const { rows: newRows } = await client.query<{ id: string }>(
+              `INSERT INTO business_locations
+                 (owner_id, name, address, phone, timezone, active, is_primary)
+               VALUES ($1, $2, $3, $4, $5, true, true)
+               RETURNING id`,
+              [business.ownerUserId, seedName, seedAddress, seedPhone, seedTz]
+            );
+            validatedLocationId = newRows[0]?.id ?? null;
+
+            if (validatedLocationId) {
+              await client.query(
+                `UPDATE users
+                    SET active_location_id = $1
+                  WHERE id = $2 AND active_location_id IS NULL`,
+                [validatedLocationId, business.ownerUserId]
+              );
+              console.log(
+                `[create-quote] auto-seeded default location ${validatedLocationId} for business ${business.id}`
+              );
+            }
+          }
+          await client.query("COMMIT");
+        } catch (seedErr: any) {
+          await client.query("ROLLBACK").catch(() => {});
+          console.error("[create-quote] auto-seed location failed:", seedErr?.message || seedErr);
+        } finally {
+          client.release();
+        }
+      }
+
+      if (!validatedLocationId) {
+        return res.status(500).json({
+          message: "Could not set up your default location. Please try again, or add one in Settings → Locations.",
+        });
+      }
+
+      const q = await createQuote({
+        ...req.body,
+        businessId: business.id,
+        locationId: validatedLocationId,
+        expiresAt,
+        serviceTypeId: validatedServiceTypeId,
+      });
 
       if (req.body.lineItems) {
         for (const li of req.body.lineItems) {
@@ -269,8 +402,19 @@ const router = Router();
         }
       }
 
-      dispatchWebhook(business.id, req.session.userId!, "quote.created", { quoteId: q.id, total: q.total, status: q.status }).catch(() => {});
-      trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_CREATED, { quoteId: q.id, total: q.total }).catch(() => {});
+      // Snapshot business tax/fee defaults onto the quote and recompute total.
+      let qWithTax = q;
+      try {
+        const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+        await applyTaxFeesToQuote(q.id);
+        const fresh = await getQuoteById(q.id);
+        if (fresh) qWithTax = fresh;
+      } catch (e: any) {
+        console.error("[tax-fees] apply on create failed:", e?.message || e);
+      }
+
+      dispatchWebhook(business.id, req.session.userId!, "quote.created", { quoteId: qWithTax.id, total: qWithTax.total, status: qWithTax.status }).catch(() => {});
+      trackEvent(req.session.userId!, AnalyticsEvents.FIRST_QUOTE_CREATED, { quoteId: qWithTax.id, total: qWithTax.total }).catch(() => {});
 
       // Flip first-quote gate flag (idempotent — no-op if already true)
       pool.query(
@@ -278,10 +422,14 @@ const router = Router();
         [req.session.userId!]
       ).catch(() => {});
 
-      return res.json(q);
+      return res.json(qWithTax);
     } catch (error: any) {
-      console.error("Create quote error:", error);
-      return res.status(500).json({ message: "Failed to create quote" });
+      console.error("[create-quote] ERROR:", error?.stack || error);
+      const detail = error?.message || String(error);
+      return res.status(500).json({
+        message: `Failed to create quote: ${detail}`,
+        detail,
+      });
     }
   });
 
@@ -331,12 +479,36 @@ const router = Router();
         }
         // Recalculate totals from the actual line items stored in DB
         const subtotal = createdItems.reduce((sum, li) => sum + (li.totalPrice || 0), 0);
-        const taxAmount = typeof (req.body.tax ?? data.tax) === "number" ? (req.body.tax ?? data.tax) : 0;
-        const total = subtotal + taxAmount;
-        q = await updateQuote(req.params.id, { subtotal, total });
+        // Persist subtotal first; applyTaxFeesToQuote will recompute tax/fee/total
+        // from the business snapshot or any per-quote override.
+        q = await updateQuote(req.params.id, { subtotal });
+        try {
+          const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+          await applyTaxFeesToQuote(q.id);
+          // Re-read to surface refreshed totals
+          const fresh = await getQuoteById(q.id);
+          if (fresh) q = fresh;
+        } catch (e: any) {
+          console.error("[tax-fees] apply on lineItems update failed:", e?.message || e);
+        }
+      } else if (typeof data.subtotal === "number") {
+        // Subtotal changed without line items — recompute tax/fee/total.
+        try {
+          const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+          await applyTaxFeesToQuote(q.id);
+          const fresh = await getQuoteById(q.id);
+          if (fresh) q = fresh;
+        } catch (e: any) {
+          console.error("[tax-fees] apply on subtotal update failed:", e?.message || e);
+        }
       }
 
       if (data.status && oldQuote && data.status !== oldQuote.status) {
+        // Snapshot the location at first send (status flipping to "sent")
+        // so the customer-facing view freezes contact info at delivery time.
+        if (data.status === "sent") {
+          ensureQuoteLocationSnapshot(q.id).catch(() => {});
+        }
         const eventMap: Record<string, string> = { sent: "quote.sent", accepted: "quote.accepted", declined: "quote.declined" };
         const eventType = eventMap[data.status];
         if (eventType && q.businessId) {
@@ -448,6 +620,11 @@ const router = Router();
         sentVia: channel,
         sentAt: new Date(),
       });
+
+      // Snapshot the assigned location's contact details so the customer-facing
+      // quote shows them as they were at send time, even if the location is
+      // later edited. Idempotent — no-op if a snapshot already exists.
+      ensureQuoteLocationSnapshot(req.params.id).catch(() => {});
 
       // Fire-and-forget: track last quote sent time for churn scoring
       pool.query(
@@ -891,7 +1068,7 @@ const quoteEmailLimiter = rateLimit({
   store: createPgRateLimitStore(pool, "quote-email:"),
 });
 
-  router.post("/quotes/:id/send-with-pdf", requireAuth, requireGrowth, quoteEmailLimiter, async (req: Request, res: Response) => {
+  router.post("/quotes/:id/send-with-pdf", requireAuth, quoteEmailLimiter, async (req: Request, res: Response) => {
     try {
       const quote = await getQuoteById(req.params.id);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
@@ -1056,6 +1233,9 @@ const quoteEmailLimiter = rateLimit({
         content: `Quote email sent to ${to}${cc ? ` (cc: ${cc})` : ""}`,
         status: "sent",
       });
+
+      // Snapshot location at send time (idempotent).
+      ensureQuoteLocationSnapshot(quote.id).catch(() => {});
 
       return res.json({ success: true, message: "Quote email sent successfully" });
     } catch (error: any) {
@@ -1323,6 +1503,7 @@ The email should:
       });
 
       await updateQuote(quote.id, { status: "sent" });
+      ensureQuoteLocationSnapshot(quote.id).catch(() => {});
 
       return res.json({ success: true, message: "Quote email sent successfully" });
     } catch (error: any) {
@@ -1428,6 +1609,42 @@ The email should:
       });
     } catch (error: any) {
       return res.status(500).json({ message: "Failed to get pipeline" });
+    }
+  });
+
+  // Tax + Convenience Fee summary (collected = quotes paid in window).
+  router.get("/revenue/tax-fees-summary", requireAuth, requireGrowth, async (req: Request, res: Response) => {
+    try {
+      const business = await getBusinessByOwner(req.session.userId!);
+      if (!business) return res.status(404).json({ message: "Business not found" });
+      const days = Math.min(365, Math.max(1, parseInt(String(req.query.days || "30"), 10) || 30));
+      const sinceDate = new Date(Date.now() - days * 86400000);
+      const { rows } = await pool.query(
+        `SELECT
+            COALESCE(SUM(subtotal), 0)::float8 AS subtotal_collected,
+            COALESCE(SUM(convenience_fee_amount), 0)::float8 AS fees_collected,
+            COALESCE(SUM(tax), 0)::float8 AS tax_collected,
+            COALESCE(SUM(total), 0)::float8 AS total_collected,
+            COUNT(*)::int AS paid_quotes
+           FROM quotes
+          WHERE business_id = $1
+            AND payment_status = 'paid'
+            AND paid_at >= $2
+            AND deleted_at IS NULL`,
+        [business.id, sinceDate],
+      );
+      const r = rows[0] || {};
+      return res.json({
+        windowDays: days,
+        subtotalCollected: Math.round((r.subtotal_collected || 0) * 100) / 100,
+        feesCollected: Math.round((r.fees_collected || 0) * 100) / 100,
+        taxCollected: Math.round((r.tax_collected || 0) * 100) / 100,
+        totalCollected: Math.round((r.total_collected || 0) * 100) / 100,
+        paidQuotes: r.paid_quotes || 0,
+      });
+    } catch (error: any) {
+      console.error("tax-fees-summary error:", error?.message || error);
+      return res.status(500).json({ message: "Failed to get tax/fees summary" });
     }
   });
 

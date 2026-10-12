@@ -78,6 +78,7 @@ import {
   createSocialLead, createAttributionEvent,
   createRecurringSeries, getRecurringSeriesByBusiness, getRecurringSeriesById,
   updateRecurringSeries, cancelRecurringSeries, skipSeriesOccurrence, generateSeriesJobs,
+  ensureQuoteLocationSnapshot,
 } from "../storage";
 import { businessFiles, sequenceEnrollments, employees, schedulePublications, cleanerScheduleNotifications, users, businesses, quotes, customers, jobs, communications, quoteFollowUps, analyticsEvents, pricingSettings, apiKeys, webhookEndpoints, webhookEvents, webhookDeliveries, tasks, photos, growthTasks, campaigns, automationRules, preferences, bookingAvailability, invoicePackets, calendarEventStubs, employeeShifts, checklistItems, jobNotes, badges, streaks, intakeRequests, pricingJobs, pricingRules, pricingQuestionnaires, leadCapture, recurringCleanSeries, salesRecommendations, pushTokens } from "../../shared/schema";
 import { getHouseCleaningPriceCalculatorPage, getDeepCleaningPriceCalculatorPage, getMoveInOutCleaningCalculatorPage, getCleaningQuoteGeneratorPage, getUltimateCleaningPricingGuidePage } from "../seo-pages";
@@ -154,14 +155,21 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
       }
 
       if (action === "accept") {
-        await updateQuote(q.id, { status: "accepted", acceptedAt: new Date() });
+        // Honor any AI-negotiated total from the Concierge widget
+        const { getActiveAcceptedOfferForQuote } = await import("../services/aiConcierge");
+        const negotiated = await getActiveAcceptedOfferForQuote(q.id);
+        const updates: any = { status: "accepted", acceptedAt: new Date() };
+        if (negotiated && negotiated.total > 0 && negotiated.total < parseFloat(String(q.total ?? 0))) {
+          updates.total = negotiated.total.toFixed(2);
+        }
+        await updateQuote(q.id, updates);
         await cancelPendingCommunicationsForQuote(q.id);
         if (q.customerId) {
           await updateCustomer(q.customerId, { status: "active" });
         }
         {
           const biz = await db_getBusinessById(q.businessId);
-          if (biz?.ownerUserId) trackEvent(biz.ownerUserId, AnalyticsEvents.FIRST_QUOTE_ACCEPTED, { quoteId: q.id }).catch(() => {});
+          if (biz?.ownerUserId) trackEvent(biz.ownerUserId, AnalyticsEvents.FIRST_QUOTE_ACCEPTED, { quoteId: q.id, negotiated: !!negotiated, finalTotal: updates.total ?? q.total }).catch(() => {});
         }
       } else if (action === "decline") {
         await updateQuote(q.id, { status: "declined", declinedAt: new Date() });
@@ -349,8 +357,24 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
       total *= freqDiscount;
       total = Math.round(total * 100) / 100;
 
+      // Multi-location: assign the business's primary location (or oldest)
+      // so the now-required quotes.location_id NOT NULL constraint is met.
+      const { rows: locRows } = await pool.query<{ id: string }>(
+        `SELECT bl.id FROM business_locations bl
+          JOIN businesses b ON b.owner_user_id = bl.owner_id
+          WHERE b.id = $1
+          ORDER BY bl.is_primary DESC, bl.created_at ASC
+          LIMIT 1`,
+        [businessId]
+      );
+      const quickQuoteLocationId = locRows[0]?.id;
+      if (!quickQuoteLocationId) {
+        return res.status(400).json({ message: "Business has no location configured." });
+      }
+
       const quote = await createQuote({
         businessId,
+        locationId: quickQuoteLocationId,
         propertyBeds: beds || 3,
         propertyBaths: baths || 2,
         propertySqft: sqft || 1500,
@@ -364,6 +388,14 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
         total,
         status: "sent",
       });
+      // Stamp the location snapshot for this auto-sent quote.
+      ensureQuoteLocationSnapshot(quote.id).catch(() => {});
+      try {
+        const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+        await applyTaxFeesToQuote(quote.id);
+      } catch (e: any) {
+        console.error("[tax-fees] apply on quick-quote failed:", e?.message || e);
+      }
 
       if (name || email || phone) {
         const nameParts = (name || "").split(" ");
@@ -565,6 +597,12 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
           expiresAt,
         });
         quoteId = q.id;
+        try {
+          const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+          await applyTaxFeesToQuote(q.id);
+        } catch (e: any) {
+          console.error("[tax-fees] apply on calculator-signup quote failed:", e?.message || e);
+        }
       }
 
       return res.json({
@@ -593,19 +631,39 @@ const _calcSignupAttempts = new Map<string, { count: number; resetAt: number }>(
 
       const amount = Math.round(quote.total * 100);
 
+      // Itemize subtotal / convenience fee / sales tax separately on the
+      // Stripe Checkout receipt so the customer sees the breakdown.
+      const { buildStripeLineItems } = await import("../services/taxFeesService");
+      const subtotalAmt = Number((quote as any).subtotal) || 0;
+      const feeAmt = Number((quote as any).convenienceFeeAmount) || 0;
+      const taxAmt = Number((quote as any).tax) || 0;
+      const lineItems = buildStripeLineItems({
+        baseName: `Cleaning Service - ${business.companyName || "Quote"}`,
+        baseDescription: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
+        subtotal: subtotalAmt,
+        feeAmount: feeAmt,
+        feeLabel: (quote as any).convenienceFeeLabel || "Convenience Fee",
+        taxAmount: taxAmt,
+        taxLabel: (quote as any).taxLabel || "Sales Tax",
+      });
+      // Sanity check: line items must sum to quote.total. Fall back to single
+      // line item if there's a mismatch (defensive — shouldn't happen).
+      const itemsCents = lineItems.reduce((s, li) => s + li.price_data.unit_amount, 0);
+      const finalLineItems = itemsCents === amount ? lineItems : [{
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: `Cleaning Service - ${business.companyName || "Quote"}`,
+            description: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
+          },
+          unit_amount: amount,
+        },
+        quantity: 1,
+      }];
+
       const checkoutSession = await (await getStripe())!.checkout.sessions.create({
         mode: "payment",
-        line_items: [{
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Cleaning Service - ${business.companyName || "Quote"}`,
-              description: `${quote.frequencySelected} cleaning - ${quote.selectedOption} option`,
-            },
-            unit_amount: amount,
-          },
-          quantity: 1,
-        }],
+        line_items: finalLineItems,
         success_url: `https://${req.get("host")}/api/stripe/payment-success?quoteId=${quote.id}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `https://${req.get("host")}/api/stripe/payment-cancel?quoteId=${quote.id}`,
         metadata: { quoteId: quote.id, businessId: business.id },
@@ -928,6 +986,16 @@ init();
       }
 
       const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      // Safe JSON encoding for inline <script> contexts. Prevents </script>
+      // breakouts and U+2028/U+2029 line-terminator injection from any
+      // user/business-controlled string flowing into JS data tokens.
+      const safeJsonForScript = (v: any) =>
+        JSON.stringify(v)
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/&/g, "\\u0026")
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029");
 
       const business = await db_getBusinessById(q.businessId);
       const customer = q.customerId ? await getCustomerById(q.customerId) : null;
@@ -936,6 +1004,27 @@ init();
       const brandColor = (qpPublic?.brandColor || business?.primaryColor || "#2563EB").replace(/[^#a-fA-F0-9]/g, "");
       const companyName = escHtml(business?.companyName || "Our Company");
       const logoUri = escHtml(business?.logoUri || "");
+
+      // Pull the location snapshot (or live location as fallback) so the
+      // customer-facing quote shows the "from" location's address/phone as
+      // they were at send time. Falls back to business contact info when no
+      // location is wired up.
+      let locSnap: any = (q as any).locationSnapshot || null;
+      if (!locSnap && (q as any).locationId) {
+        try {
+          const { rows: lr } = await pool.query(
+            "SELECT id, name, address, phone, timezone FROM business_locations WHERE id = $1",
+            [(q as any).locationId]
+          );
+          if (lr[0]) locSnap = lr[0];
+        } catch {}
+      }
+      // Override the business contact fields used by downstream HTML so the
+      // location's details flow through every template branch below.
+      if (business) {
+        if (locSnap?.phone) (business as any).phone = locSnap.phone;
+        if (locSnap?.address) (business as any).address = locSnap.address;
+      }
 
       const isPreview = req.query.preview === "1";
       try {
@@ -1478,8 +1567,26 @@ loadMonth(nextMo);
       if (customerAddress) propertyPills.push(customerAddress);
 
       const firstName = customerName ? customerName.split(" ")[0] : "";
-      const greeting = firstName ? `Hi ${firstName},` : "Your Cleaning Quote";
-      const subtitleText = firstName ? "Here's your personalized quote. Review your options and accept when ready." : "Review the details below and accept when ready.";
+
+      // Service Types (Option B): override quote noun based on selected service type.
+      // Falls back to "Cleaning Quote" if none selected.
+      let quoteNoun = "Cleaning Quote";
+      let serviceTypePricingModel: "tiered" | "flat" = "tiered";
+      if ((q as any).serviceTypeId && q.businessId) {
+        try {
+          const { getServiceType, buildQuoteTitle } = await import("../services/serviceTypesService");
+          const st = await getServiceType(q.businessId, (q as any).serviceTypeId);
+          if (st) {
+            quoteNoun = buildQuoteTitle(st);
+            serviceTypePricingModel = st.pricingModel as "tiered" | "flat";
+          }
+        } catch (_e) {}
+      }
+      const greeting = firstName ? `Hi ${firstName},` : `Your ${quoteNoun}`;
+      const subtitleText = firstName
+        ? "Here's your personalized quote. Review your options and accept when ready."
+        : "Review the details below and accept when ready.";
+      void serviceTypePricingModel; // reserved for future flat-layout switch (T306 follow-up)
 
       const freqLabels: Record<string, string> = { weekly: "Weekly", biweekly: "Bi-weekly", monthly: "Monthly", quarterly: "Quarterly" };
       const frequencyLabel = q.frequencySelected && q.frequencySelected !== "one-time" ? (freqLabels[q.frequencySelected] || q.frequencySelected) : "";
@@ -1496,6 +1603,31 @@ loadMonth(nextMo);
       const depositAmount = Number(q.depositAmount) || 0;
       const lineItemsSum = lineItems.reduce((s: number, li: any) => s + (Number(li.totalPrice) || 0), 0);
       const totalNum = Number(q.total) > 0 ? Number(q.total) : lineItemsSum > 0 ? lineItemsSum : 0;
+      const subtotalNum = Number((q as any).subtotal) > 0 ? Number((q as any).subtotal) : totalNum;
+      const feeAmtNum = Number((q as any).convenienceFeeAmount) || 0;
+      const taxAmtNum = Number((q as any).tax) || 0;
+      const taxRateNum = Number((q as any).taxRate) || 0;
+      const feeLabelStr = String((q as any).convenienceFeeLabel || "Convenience Fee");
+      const taxLabelStr = String((q as any).taxLabel || "Sales Tax");
+      const feeTypeStr = (q as any).convenienceFeeType || null;
+      const feeValueNum = (q as any).convenienceFeeValue !== null && (q as any).convenienceFeeValue !== undefined
+        ? Number((q as any).convenienceFeeValue) : null;
+      const taxAppliesToStr = (q as any).taxAppliesTo === "subtotal_plus_fee" ? "subtotal_plus_fee" : "subtotal";
+      const hasFeeOrTax = feeAmtNum > 0 || taxAmtNum > 0;
+      let feeRowHtml = "";
+      if (feeAmtNum > 0) {
+        feeRowHtml = `<div class="line-item-row"><span class="line-item-name">${escHtml(feeLabelStr)}</span><span class="line-item-price" id="feeAmount">$${feeAmtNum.toFixed(2)}</span></div>`;
+      }
+      let taxRowHtml = "";
+      if (taxAmtNum > 0) {
+        const ratePct = (taxRateNum * 100).toFixed(taxRateNum * 100 % 1 === 0 ? 0 : 3).replace(/\.?0+$/, "");
+        const taxLabelDisplay = taxRateNum > 0 ? `${escHtml(taxLabelStr)} (${ratePct}%)` : escHtml(taxLabelStr);
+        taxRowHtml = `<div class="line-item-row"><span class="line-item-name">${taxLabelDisplay}</span><span class="line-item-price" id="taxAmount">$${taxAmtNum.toFixed(2)}</span></div>`;
+      }
+      let subtotalRowHtml = "";
+      if (hasFeeOrTax) {
+        subtotalRowHtml = `<div class="line-item-row"><span class="line-item-name" style="font-weight:600">Subtotal</span><span class="line-item-price" id="subtotalAmount">$${subtotalNum.toFixed(2)}</span></div>`;
+      }
       console.log(`[quote render] token=${req.params.token} q.total=${q.total} lineItemsSum=${lineItemsSum} totalNum=${totalNum} lineItems=${lineItems.length}`);
       const depositFormatted = depositAmount.toFixed(2);
       const balanceFormatted = Math.max(0, totalNum - depositAmount).toFixed(2);
@@ -1555,9 +1687,23 @@ loadMonth(nextMo);
         "{{totalFormatted}}": totalNum.toFixed(2),
         "{{publicToken}}": q.publicToken || "",
         "{{preselectedOption}}": preselectedOption,
-        "{{optionDataJson}}": JSON.stringify(optionDataItems),
-        "{{addonDataJson}}": JSON.stringify(addonDataItems),
-        "{{optionAddOnsIncludedJson}}": JSON.stringify(optionAddOnsIncludedByTier),
+        "{{optionDataJson}}": safeJsonForScript(optionDataItems),
+        "{{addonDataJson}}": safeJsonForScript(addonDataItems),
+        "{{subtotalRowHtml}}": subtotalRowHtml,
+        "{{feeRowHtml}}": feeRowHtml,
+        "{{taxRowHtml}}": taxRowHtml,
+        "{{taxFeeConfigJson}}": safeJsonForScript({
+          subtotal: subtotalNum,
+          taxRate: taxRateNum,
+          taxLabel: taxLabelStr,
+          taxAppliesTo: taxAppliesToStr,
+          feeType: feeTypeStr,
+          feeValue: feeValueNum,
+          feeLabel: feeLabelStr,
+          feeAmount: feeAmtNum,
+          taxAmount: taxAmtNum,
+        }),
+        "{{optionAddOnsIncludedJson}}": safeJsonForScript(optionAddOnsIncludedByTier),
         "{{optionsHtml}}": optionsHtml,
         "{{addOnsHtml}}": addOnsHtml,
         "{{lineItemsHtml}}": lineItemsHtml,
@@ -1596,6 +1742,7 @@ loadMonth(nextMo);
         "hasSingleOption": optionDataItems.length === 1,
         "hasAddOns": addonDataItems.length > 0,
         "hasLineItems": lineItems.length > 0,
+        "hasFeeOrTax": hasFeeOrTax,
         "hasDeposit": depositRequired && depositAmount > 0,
         "hasExpiry": hasExpiry,
         "hasTrust": hasTrust,
@@ -1690,16 +1837,21 @@ loadMonth(nextMo);
         updateData.propertyDetails = updatedDetails;
       }
 
+      // Build a new subtotal from the customer's tier + add-on choices, then
+      // let applyTaxFeesToQuote recompute fee/tax/total downstream so the
+      // amount we charge in Stripe matches what the customer just saw.
+      let newSubtotal: number | null = null;
       if (selectedOption && ["good", "better", "best"].includes(selectedOption)) {
         updateData.selectedOption = selectedOption;
         const opts = (q.options || {}) as any;
         const optVal = opts[selectedOption];
         if (optVal !== undefined) {
           const price = typeof optVal === "object" ? optVal.price : optVal;
-          if (price !== undefined) {
-            updateData.total = Number(price);
-          }
+          if (price !== undefined) newSubtotal = Number(price);
         }
+      }
+      if (newSubtotal === null) {
+        newSubtotal = Number((q as any).subtotal) || Number(q.total) || 0;
       }
 
       if (selectedAddons && typeof selectedAddons === "object") {
@@ -1721,11 +1873,19 @@ loadMonth(nextMo);
         for (const val of Object.values(validatedAddOns) as any[]) {
           if (val.selected && val.price) addOnsTotal += Number(val.price);
         }
-        const basePrice = updateData.total || Number(q.total) || 0;
-        updateData.total = basePrice + addOnsTotal;
+        newSubtotal = (newSubtotal || 0) + addOnsTotal;
       }
 
+      updateData.subtotal = newSubtotal;
+      // Don't pre-set total — applyTaxFeesToQuote rewrites it from snapshot.
+
       await updateQuote(q.id, updateData);
+      try {
+        const { applyTaxFeesToQuote } = await import("../services/taxFeesService");
+        await applyTaxFeesToQuote(q.id);
+      } catch (e: any) {
+        console.error("[tax-fees] apply on accept failed:", e?.message || e);
+      }
       await cancelPendingCommunicationsForQuote(q.id);
 
       // Generate Revenue Playbook recommendations
@@ -2270,50 +2430,29 @@ Return ONLY valid JSON — no markdown, no preamble:
     usingDefaultPricing: boolean;
   } {
     const s = stored || {};
+
+    // Owner has explicitly saved their pricing → trust them.
+    // (Stamped by PUT /api/pricing in pricingRouter.)
+    if (s.pricingCustomizedAt) {
+      return {
+        configured: true,
+        missingItems: [],
+        completionPercent: 100,
+        usingDefaultPricing: false,
+      };
+    }
+
     const missing: string[] = [];
     let passed = 0;
-    const TOTAL = 4;
+    const TOTAL = 2;
 
-    // 1. Hourly rate customized
     const hr = Number(s.hourlyRate ?? 0);
-    if (hr > 0 && hr !== 35 && hr !== 40 && hr !== 45) {
-      passed++;
-    } else {
-      missing.push("Hourly rate not set");
-    }
+    if (hr > 0) passed++;
+    else missing.push("Hourly rate not set");
 
-    // 2. Minimum ticket customized
     const mt = Number(s.minimumTicket ?? 0);
-    if (mt > 0 && mt !== 100 && mt !== 80) {
-      passed++;
-    } else {
-      missing.push("Minimum ticket not set");
-    }
-
-    // 3. At least one service type customized
-    const FACTORY_NAMES = new Set([
-      "standard", "standard clean", "deep clean", "deep",
-      "move in/out", "move in / out", "move-in/move-out",
-      "move out", "recurring", "recurring clean",
-    ]);
-    const serviceTypes: any[] = s.serviceTypes || [];
-    const hasCustomST = serviceTypes.some(
-      (st: any) => st?.name && !FACTORY_NAMES.has(st.name.trim().toLowerCase())
-    );
-    if (hasCustomST) {
-      passed++;
-    } else {
-      missing.push("Service type names not customized");
-    }
-
-    // 4. At least 3 add-on prices set
-    const addOns = s.addOnPrices || {};
-    const nonZero = Object.values(addOns).filter((v: any) => Number(v) > 0).length;
-    if (nonZero >= 3) {
-      passed++;
-    } else {
-      missing.push(`Add-on prices not configured (${nonZero}/3 set)`);
-    }
+    if (mt > 0) passed++;
+    else missing.push("Minimum ticket not set");
 
     const configured = passed === TOTAL;
     return {
@@ -2819,7 +2958,7 @@ router.post("/api/public/quote-request", quoteRequestLimiter, async (req: Reques
     );
     const autopilotEnabled = userRes.rows[0]?.autopilot_enabled ?? false;
 
-    // Create lead record
+    // Create lead record (legacy table — required for autopilot processing).
     const leadRes = await pool.query(
       `INSERT INTO leads (user_id, business_slug, contact, home, preferences, status)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -2827,6 +2966,35 @@ router.post("/api/public/quote-request", quoteRequestLimiter, async (req: Reques
       [biz.user_id, businessSlug, JSON.stringify(contact), JSON.stringify(home), JSON.stringify(preferences), "new"]
     );
     const leadId = leadRes.rows[0].id;
+
+    // Mirror into intake_requests so the submission appears in the
+    // operator's "Quote Requests" portal (which is intake_requests-backed).
+    // Best-effort: never fail the customer's submission on this.
+    try {
+      const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
+      const fullAddress = [contact.street, contact.apt, contact.city, contact.state, contact.zip]
+        .filter(Boolean)
+        .join(", ");
+      await pool.query(
+        `INSERT INTO intake_requests
+           (business_id, customer_name, customer_email, customer_phone, customer_address,
+            extracted_fields, source, status, confidence)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          biz.id,
+          fullName || (contact.email || "Customer"),
+          contact.email || "",
+          contact.phone || "",
+          fullAddress,
+          JSON.stringify({ contact, home, preferences, leadId }),
+          "instant_quote_request",
+          "pending",
+          "high",
+        ]
+      );
+    } catch (mirrorErr: any) {
+      console.warn("[quote-request] intake_requests mirror failed:", mirrorErr.message);
+    }
 
     if (autopilotEnabled) {
       // Fire-and-forget: process async (no Redis needed)

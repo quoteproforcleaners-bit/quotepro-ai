@@ -17,10 +17,12 @@ import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useSubscription, type PlanTier } from "@/context/SubscriptionContext";
+import { useAuth } from "@/context/AuthContext";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useLanguage } from "@/context/LanguageContext";
 import { trackEvent } from "@/lib/analytics";
 import type { PurchasesPackage } from "react-native-purchases";
+import { isWeeklyProduct, WEEKLY_PRODUCTS } from "../../shared/paidAccess";
 
 type PaywallParams = {
   Paywall: { trigger_source?: string; required_tier?: PlanTier } | undefined;
@@ -49,13 +51,13 @@ interface PlanDefinition {
 const PLAN_FEATURES: PlanDefinition[] = [
   {
     id: "starter",
-    label: "Starter",
-    monthlyPrice: "$19",
+    label: "Basic",
+    monthlyPrice: "",
     subtitle: "Start winning more jobs",
     supportsAnnual: false,
     features: [
       { icon: "home", label: "Professional Good / Better / Best quoting" },
-      { icon: "file-text", label: "Up to 20 quotes per month" },
+      { icon: "file-text", label: "Unlimited manual quotes" },
       { icon: "link", label: "Branded client intake link" },
       { icon: "users", label: "Basic CRM & lead tracking" },
       { icon: "download", label: "PDF quote export" },
@@ -63,16 +65,13 @@ const PLAN_FEATURES: PlanDefinition[] = [
   },
   {
     id: "growth",
-    label: "Growth",
-    monthlyPrice: "$49",
-    annualPrice: "$470",
-    annualPerMonth: "$39",
-    savings: "Save $118/yr",
+    label: "AI",
+    monthlyPrice: "",
     subtitle: "Best for most cleaning businesses",
-    supportsAnnual: true,
+    supportsAnnual: false,
     highlight: true,
     features: [
-      { icon: "check-circle", label: "Everything in Starter, unlimited quotes" },
+      { icon: "check-circle", label: "Everything in Basic, plus AI assistance" },
       { icon: "cpu", label: "AI quote builder — quote any job by voice" },
       { icon: "trending-up", label: "Smart upsells — add $40-80 per job on average" },
       { icon: "send", label: "Automated follow-ups that close more leads" },
@@ -81,28 +80,10 @@ const PLAN_FEATURES: PlanDefinition[] = [
       { icon: "star", label: "Review request automation" },
     ],
   },
-  {
-    id: "pro",
-    label: "Pro",
-    monthlyPrice: "$99",
-    annualPrice: "$950",
-    annualPerMonth: "$79",
-    savings: "Save $238/yr",
-    subtitle: "For high-volume operations",
-    supportsAnnual: true,
-    features: [
-      { icon: "check-circle", label: "Everything in Growth" },
-      { icon: "link", label: "QuickBooks sync" },
-      { icon: "briefcase", label: "Commercial quote builder" },
-      { icon: "search", label: "Lead finder & outreach tools" },
-      { icon: "activity", label: "Revenue intelligence analytics" },
-      { icon: "settings", label: "Custom automation rules" },
-      { icon: "phone", label: "Priority support" },
-    ],
-  },
 ];
 
 export default function PaywallScreen() {
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<PaywallParams, "Paywall">>();
@@ -124,16 +105,16 @@ export default function PaywallScreen() {
   } = useSubscription();
   const { t } = useLanguage();
 
-  const defaultPlan: SelectedPlan = requiredTier === "starter" ? "starter" : requiredTier === "pro" ? "pro" : "growth";
+  const defaultPlan: SelectedPlan = requiredTier === "growth" || requiredTier === "pro" ? "growth" : "starter";
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan>(defaultPlan);
-  const [billing, setBilling] = useState<BillingInterval>(defaultPlan !== "starter" ? "annual" : "monthly");
+  const [billing, setBilling] = useState<BillingInterval>("monthly");
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [modal, setModal] = useState<ModalState>({ visible: false, type: "info", title: "", message: "" });
 
   const useMaxWidth = screenWidth > 600;
-  const canPurchase = offeringsStatus === "ready" || Platform.OS === "web";
+  const canPurchase = offeringsStatus === "ready" && Platform.OS === "ios";
   const planDef = PLAN_FEATURES.find(p => p.id === selectedPlan) || PLAN_FEATURES[1];
 
   useEffect(() => {
@@ -144,47 +125,18 @@ export default function PaywallScreen() {
     if (!currentOffering) return null;
     const pkgs = currentOffering.availablePackages;
 
-    const findPkg = (identifier: string) => pkgs.find(p => p.identifier === identifier) ?? null;
-
-    if (selectedPlan === "starter") {
-      return findPkg("starter_monthly") || findPkg("STARTER_MONTHLY") || null;
-    }
-    if (selectedPlan === "growth") {
-      if (billing === "annual") {
-        return findPkg("$rc_annual") || findPkg("growth_annual") || findPkg("GROWTH_ANNUAL") || null;
-      }
-      return findPkg("$rc_monthly") || findPkg("growth_monthly") || findPkg("GROWTH_MONTHLY") || null;
-    }
-    if (selectedPlan === "pro") {
-      if (billing === "annual") {
-        return findPkg("pro_annual") || findPkg("PRO_ANNUAL") || null;
-      }
-      return findPkg("pro_monthly") || findPkg("PRO_MONTHLY") || null;
-    }
-    return null;
+    return pkgs.find(p => isWeeklyProduct(p.product) &&
+      WEEKLY_PRODUCTS[p.product.identifier as keyof typeof WEEKLY_PRODUCTS] === selectedPlan) ?? null;
   }, [currentOffering, selectedPlan, billing]);
 
   // PRIMARY price = what is actually charged (Apple requires this to be most prominent)
   const displayPrice = useMemo(() => {
-    if (billing === "annual" && planDef.supportsAnnual) {
-      // Annual: show the billed total (e.g. "$470/year") — this IS the charge
-      if (selectedPackage?.product?.priceString) return `${selectedPackage.product.priceString}/year`;
-      return planDef.annualPrice ? `${planDef.annualPrice}/year` : `${planDef.monthlyPrice}/mo`;
-    }
-    // Monthly: the monthly price IS the billed amount
-    if (selectedPackage?.product?.priceString) return `${selectedPackage.product.priceString}/mo`;
-    return `${planDef.monthlyPrice}/mo`;
+    return selectedPackage?.product.priceString ? `${selectedPackage.product.priceString}/week` : "Price unavailable";
   }, [selectedPackage, billing, planDef]);
 
   // SECONDARY note = subordinate info (monthly equivalent, savings, trial)
   const displayBilledNote = useMemo(() => {
-    if (billing === "annual" && planDef.supportsAnnual && planDef.annualPerMonth) {
-      return `${planDef.annualPerMonth}/mo · ${planDef.savings}`;
-    }
-    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
-      return `then ${planDef.monthlyPrice}/mo · billed monthly`;
-    }
-    return "billed monthly";
+    return "Billed weekly · No free trial";
   }, [billing, planDef, trialInfo, selectedPlan]);
 
   const contextualHeader = triggerSource === "quote_limit"
@@ -204,13 +156,14 @@ export default function PaywallScreen() {
     setModal(m => ({ ...m, visible: false }));
     if (wasSuccess) {
       if (navigation.canGoBack()) navigation.goBack();
-      setTimeout(() => { (navigation as any).navigate("ProSetupChecklist"); }, 400);
     }
   };
 
   const handleRetryOfferings = async () => {
     setRetrying(true);
-    try { await retryLoadOfferings(); } finally { setRetrying(false); }
+    try { await retryLoadOfferings(); }
+    catch { showModal("error", "Unable to verify subscription", "Please retry when your connection is available."); }
+    finally { setRetrying(false); }
   };
 
   const handlePurchase = async () => {
@@ -270,17 +223,7 @@ export default function PaywallScreen() {
 
   const ctaText = (() => {
     if (offeringsStatus === "loading" && Platform.OS !== "web") return "Loading...";
-    if (trialInfo.hasFreeTrial && trialInfo.trialDurationText && selectedPlan !== "starter") {
-      return `Try ${planDef.label} free for ${trialInfo.trialDurationText}`;
-    }
-    if (selectedPlan === "starter") return "Start with Starter — $19/mo";
-    if (selectedPlan === "growth") {
-      return billing === "annual" ? `Get Growth — $470/year` : "Start Growth — $49/mo";
-    }
-    if (selectedPlan === "pro") {
-      return billing === "annual" ? `Get Pro — $950/year` : "Go Pro — $99/mo";
-    }
-    return `Get ${planDef.label}`;
+    return selectedPackage ? `Subscribe to ${planDef.label} — ${displayPrice}` : "Subscription unavailable";
   })();
 
   const modalIcon = modal.type === "success" ? "check-circle" : modal.type === "error" ? "alert-circle" : "info";
@@ -451,10 +394,16 @@ export default function PaywallScreen() {
                 onPress={() => navigation.goBack()}
                 style={[styles.continueBtn, { borderColor: theme.border }]}
               >
-                <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>Continue Free</ThemedText>
+                <ThemedText type="small" style={{ color: theme.textSecondary, fontWeight: "600" }}>Back</ThemedText>
               </Pressable>
             </View>
           </View>
+        ) : null}
+
+        {!user ? (
+          <Pressable onPress={() => (navigation as any).navigate("Login")} style={styles.retryBtn}>
+            <ThemedText type="link">Sign in to subscribe</ThemedText>
+          </Pressable>
         ) : null}
 
         <ThemedText type="caption" style={[styles.disclosureText, { color: theme.textSecondary }]}>
@@ -463,12 +412,12 @@ export default function PaywallScreen() {
 
         <Pressable
           onPress={handlePurchase}
-          disabled={purchasing || restoring || (offeringsStatus === "loading" && Platform.OS !== "web")}
+          disabled={purchasing || restoring || subscriptionLoading || !canPurchase || !selectedPackage}
           style={[
             styles.purchaseBtn,
             {
               backgroundColor: theme.accent,
-              opacity: (purchasing || (offeringsStatus === "loading" && Platform.OS !== "web")) ? 0.5 : 1,
+              opacity: (purchasing || subscriptionLoading || !canPurchase || !selectedPackage) ? 0.5 : 1,
             },
           ]}
           testID="button-purchase"

@@ -80,6 +80,18 @@ export const AnalyticsEvents = {
   // ─── Referral program ────────────────────────────────────────────────────────
   REFERRAL_CREDIT_APPLIED: "referral_credit_applied",
   REFERRAL_CAP_REACHED: "referral_cap_reached",
+
+  // ─── AI Concierge Widget ─────────────────────────────────────────────────────
+  CONCIERGE_WIDGET_OPENED: "concierge_widget_opened",
+  CONCIERGE_MESSAGE_SENT: "concierge_message_sent",
+  CONCIERGE_INTENT_DETECTED: "concierge_intent_detected",
+  CONCIERGE_OFFER_MADE: "concierge_offer_made",
+  CONCIERGE_OFFER_ACCEPTED: "concierge_offer_accepted",
+  CONCIERGE_NUDGE_SHOWN: "concierge_nudge_shown",
+  CONCIERGE_NUDGE_CLICKED: "concierge_nudge_clicked",
+  CONCIERGE_COMPARISON_SHOWN: "concierge_comparison_shown",
+  CONCIERGE_POST_ACCEPT_USED: "concierge_post_accept_used",
+  CONCIERGE_WEEKLY_DIGEST_SENT: "concierge_weekly_digest_sent",
 } as const;
 
 export type AnalyticsEventName = (typeof AnalyticsEvents)[keyof typeof AnalyticsEvents];

@@ -79,6 +79,7 @@ import {
   type LeadFinderSettings,
   type LeadFinderLead,
   type LeadFinderReply,
+  businessLocations,
 } from "@shared/schema";
 
 export async function getUserById(id: string): Promise<User | undefined> {
@@ -211,6 +212,7 @@ export async function updateBusiness(
     paymentNotes: string | null;
     quotePreferences: unknown;
     sendgridApiKey: string | null;
+    taxFeesSettings: unknown;
   }>
 ): Promise<Business> {
   const [business] = await db
@@ -418,29 +420,68 @@ export async function getQuotesByBusiness(
  */
 export async function getQuotesWithCustomersByBusiness(
   businessId: string,
-  opts?: { status?: string; customerId?: string }
-): Promise<(QuoteRow & { customerName: string | null })[]> {
+  opts?: { status?: string; customerId?: string; locationId?: string }
+): Promise<(QuoteRow & { customerName: string | null; locationName: string | null })[]> {
   const conditions = [eq(quotes.businessId, businessId), isNull(quotes.deletedAt)];
   if (opts?.status) conditions.push(eq(quotes.status, opts.status));
   if (opts?.customerId) conditions.push(eq(quotes.customerId, opts.customerId));
+  if (opts?.locationId) conditions.push(eq(quotes.locationId, opts.locationId));
 
   const rows = await db
     .select({
       quote: quotes,
       firstName: customers.firstName,
       lastName: customers.lastName,
+      locationName: businessLocations.name,
     })
     .from(quotes)
     .leftJoin(customers, eq(quotes.customerId, customers.id))
+    .leftJoin(businessLocations, eq(quotes.locationId, businessLocations.id))
     .where(and(...conditions))
     .orderBy(desc(quotes.createdAt));
 
-  return rows.map(({ quote, firstName, lastName }) => ({
+  return rows.map(({ quote, firstName, lastName, locationName }) => ({
     ...quote,
     customerName: firstName || lastName
       ? `${firstName ?? ""} ${lastName ?? ""}`.trim()
       : null,
+    locationName: locationName ?? null,
   }));
+}
+
+/**
+ * Idempotently snapshot the assigned location into quotes.location_snapshot.
+ * Called at send-time so the customer-facing quote shows the location's
+ * details as they were when delivered, even if the location is edited later.
+ * Returns the snapshot object (or null if no location to snapshot).
+ */
+export async function ensureQuoteLocationSnapshot(
+  quoteId: string
+): Promise<{ id: string; name: string | null; address: string | null; phone: string | null; timezone: string | null } | null> {
+  const { rows } = await pool.query<any>(
+    `SELECT q.location_snapshot, bl.id, bl.name, bl.address, bl.phone, bl.timezone
+       FROM quotes q
+       LEFT JOIN business_locations bl ON bl.id = q.location_id
+      WHERE q.id = $1`,
+    [quoteId]
+  );
+  const row = rows[0];
+  if (!row) return null;
+  if (row.location_snapshot) return row.location_snapshot;
+  if (!row.id) return null;
+  const snap = {
+    id: row.id,
+    name: row.name ?? null,
+    address: row.address ?? null,
+    phone: row.phone ?? null,
+    timezone: row.timezone ?? null,
+    snapshottedAt: new Date().toISOString(),
+  };
+  await pool.query(
+    "UPDATE quotes SET location_snapshot = $1::jsonb WHERE id = $2 AND location_snapshot IS NULL",
+    [JSON.stringify(snap), quoteId]
+  );
+  return snap;
 }
 
 export async function getQuoteById(id: string): Promise<QuoteRow | undefined> {
@@ -475,6 +516,7 @@ export async function getQuoteByToken(token: string): Promise<QuoteRow | undefin
 
 export async function createQuote(data: {
   businessId: string;
+  locationId: string;
   customerId?: string;
   propertyBeds: number;
   propertyBaths: number;
@@ -492,11 +534,20 @@ export async function createQuote(data: {
   emailDraft?: string;
   smsDraft?: string;
   expiresAt?: Date;
+  serviceTypeId?: string | null;
+  taxRate?: number;
+  taxLabel?: string;
+  taxAppliesTo?: string;
+  convenienceFeeType?: string | null;
+  convenienceFeeValue?: number | null;
+  convenienceFeeAmount?: number;
+  convenienceFeeLabel?: string;
 }): Promise<QuoteRow> {
   const [q] = await db
     .insert(quotes)
     .values({
       businessId: data.businessId,
+      locationId: data.locationId,
       customerId: data.customerId || null,
       propertyBeds: data.propertyBeds,
       propertyBaths: data.propertyBaths,
@@ -514,6 +565,14 @@ export async function createQuote(data: {
       emailDraft: data.emailDraft || null,
       smsDraft: data.smsDraft || null,
       expiresAt: data.expiresAt || null,
+      ...(data.serviceTypeId ? { serviceTypeId: data.serviceTypeId } : {}),
+      ...(data.taxRate !== undefined ? { taxRate: data.taxRate } : {}),
+      ...(data.taxLabel !== undefined ? { taxLabel: data.taxLabel } : {}),
+      ...(data.taxAppliesTo !== undefined ? { taxAppliesTo: data.taxAppliesTo } : {}),
+      ...(data.convenienceFeeType !== undefined ? { convenienceFeeType: data.convenienceFeeType } : {}),
+      ...(data.convenienceFeeValue !== undefined ? { convenienceFeeValue: data.convenienceFeeValue } : {}),
+      ...(data.convenienceFeeAmount !== undefined ? { convenienceFeeAmount: data.convenienceFeeAmount } : {}),
+      ...(data.convenienceFeeLabel !== undefined ? { convenienceFeeLabel: data.convenienceFeeLabel } : {}),
     })
     .returning();
   return q;
@@ -557,6 +616,14 @@ export async function updateQuote(
     acceptedSource: string;
     acceptedNotes: string;
     acceptedPreferences: any;
+    taxRate: number;
+    taxLabel: string;
+    taxAppliesTo: string;
+    convenienceFeeType: string | null;
+    convenienceFeeValue: number | null;
+    convenienceFeeAmount: number;
+    convenienceFeeLabel: string;
+    viewedAt: Date;
   }>
 ): Promise<QuoteRow> {
   const [q] = await db

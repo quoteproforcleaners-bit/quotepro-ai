@@ -98,6 +98,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { to: "/quote-preferences", label: "Quote Settings",  icon: Sliders,    description: "Control what appears on your quotes — service lines, terms, branding, and layout preferences." },
   { to: "/pricing-logic",     label: "Pricing Engine",  icon: Brain,      description: "AI-powered pricing logic based on your market, home size, and service type." },
   { to: "/staff",             label: "Team & Staff",    icon: UserCog,    description: "Add cleaners, manage their PINs, share QR codes for mobile login, and track who's clocked in." },
+  { to: "/account/team",      label: "Account Members", icon: Users,      description: "Invite admins, managers, and estimators to your QuotePro account and manage their roles." },
   { to: "/sales-strategy",    label: "Sales Strategy",  icon: Layers,     pro: true, description: "Personalized sales playbooks and closing scripts tuned to your market and pricing." },
   { to: "/file-library",      label: "File Library",    icon: FolderOpen, description: "Store and manage your contracts, before/after photos, and cleaning checklists in one place." },
   { to: "/nps-dashboard",     label: "NPS Dashboard",   icon: BarChart2,  description: "Customer satisfaction scores, verbatim feedback, and churn risk signals from your NPS surveys." },
@@ -591,7 +592,7 @@ function renderNavItems(
 
 export function Layout() {
   const { user, business } = useAuth();
-  const { isPro } = useSubscription();
+  const { isPro, isInFreeTrial, freeTrialDaysLeft, trackUpgradeClick } = useSubscription();
   const { isCompleted, isDismissed, startTour, resetTour } = useWalkthrough();
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -1008,36 +1009,55 @@ export function Layout() {
 
               <AppStoreQR />
 
-              {/* Upgrade CTA */}
-              {!isPro ? (
-                <div style={{ padding: "0 10px 10px" }}>
-                  <button
-                    onClick={() => navigate("/upgrade?source=sidebar")}
-                    style={{
-                      width: "100%", padding: "12px 14px", borderRadius: "12px",
-                      background: "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)",
-                      border: "none", cursor: "pointer", textAlign: "left",
-                      transition: "opacity .1s",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.88"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
-                      <Crown style={{ width: "13px", height: "13px", color: "#fbbf24" }} />
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "white" }}>Upgrade to Growth</span>
-                    </div>
-                    <p style={{ fontSize: "10px", color: "rgba(147,197,253,0.9)", margin: "0 0 6px", lineHeight: 1.45 }}>
-                      Unlimited quotes, AI tools, CRM &amp; more
-                    </p>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", fontWeight: 600, color: "rgba(147,197,253,0.8)" }}>
-                      <span>From $19/mo</span>
-                      <span style={{ opacity: 0.5 }}>·</span>
-                      <span>7-day free trial</span>
-                      <ArrowUpRight style={{ width: "10px", height: "10px", marginLeft: "auto" }} />
-                    </div>
-                  </button>
-                </div>
-              ) : null}
+              {/* Upgrade CTA — trial-aware */}
+              {!isPro && (() => {
+                const inTrial = isInFreeTrial && (freeTrialDaysLeft ?? 0) > 0;
+                const daysLeft = freeTrialDaysLeft ?? 0;
+                const trigger = inTrial ? "sidebar_trial" : "sidebar_generic";
+
+                const handleClick = () => {
+                  try { trackUpgradeClick("growth", trigger); } catch {}
+                  navigate(`/upgrade?source=${trigger}`);
+                };
+
+                return (
+                  <div style={{ padding: "0 10px 10px" }}>
+                    <button
+                      onClick={handleClick}
+                      style={{
+                        width: "100%", padding: "12px 14px", borderRadius: "12px",
+                        background: inTrial
+                          ? "linear-gradient(135deg, #b45309 0%, #d97706 55%, #f59e0b 100%)"
+                          : "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #2563eb 100%)",
+                        border: "none", cursor: "pointer", textAlign: "left",
+                        transition: "opacity .1s",
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = "0.88"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                        <Crown style={{ width: "13px", height: "13px", color: "#fbbf24" }} />
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "white" }}>
+                          {inTrial
+                            ? (daysLeft === 1 ? "Trial: 1 day left" : `Trial: ${daysLeft} days left`)
+                            : "Upgrade to Growth"}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: "10px", color: "rgba(255,237,213,0.95)", margin: "0 0 6px", lineHeight: 1.45 }}>
+                        {inTrial
+                          ? "Lock in unlimited quotes & AI follow-ups before your trial ends"
+                          : "Unlimited quotes, AI tools, CRM & more"}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", fontWeight: 600, color: "rgba(255,237,213,0.85)" }}>
+                        <span>{inTrial ? "Activate now" : "From $19/mo"}</span>
+                        <span style={{ opacity: 0.5 }}>·</span>
+                        <span>{inTrial ? "Keep all your data" : "7-day free trial"}</span>
+                        <ArrowUpRight style={{ width: "10px", height: "10px", marginLeft: "auto" }} />
+                      </div>
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* ── User row ── */}
               <div style={{ borderTop: "0.5px solid var(--sep)", padding: "8px 10px 10px" }}>

@@ -101,6 +101,52 @@ pool.query(`
     }
   });
 
+  // Normalize/clamp taxFeesSettings JSONB before persisting so malformed input
+  // can't poison downstream tax/fee math.
+  function sanitizeTaxFeesSettings(input: any): any {
+    if (input === null) return null;
+    if (!input || typeof input !== "object") return undefined;
+    const tIn = input.tax || {};
+    const fIn = input.fee || {};
+    const clampNum = (n: any, min: number, max: number, fallback: number) => {
+      const v = typeof n === "number" ? n : parseFloat(n);
+      if (!isFinite(v)) return fallback;
+      return Math.max(min, Math.min(max, v));
+    };
+    const trimStr = (s: any, max: number, fallback: string) => {
+      const v = typeof s === "string" ? s.trim().slice(0, max) : "";
+      return v || fallback;
+    };
+    return {
+      tax: {
+        enabled: !!tIn.enabled,
+        rate: clampNum(tIn.rate, 0, 0.5, 0), // 0–50%
+        label: trimStr(tIn.label, 40, "Sales Tax"),
+        appliesTo: tIn.appliesTo === "subtotal_plus_fee" ? "subtotal_plus_fee" : "subtotal",
+      },
+      fee: {
+        enabled: !!fIn.enabled,
+        type: fIn.type === "flat" ? "flat" : "percentage",
+        value: clampNum(fIn.value, 0, fIn.type === "flat" ? 9999 : 100, 0),
+        label: trimStr(fIn.label, 40, "Convenience Fee"),
+        appliesTo: fIn.appliesTo === "all" ? "all" : "card_only",
+        helperText: typeof fIn.helperText === "string" ? fIn.helperText.slice(0, 280) : "",
+      },
+    };
+  }
+
+  function withSanitizedBody(body: any): any {
+    if (body && Object.prototype.hasOwnProperty.call(body, "taxFeesSettings")) {
+      const sanitized = sanitizeTaxFeesSettings(body.taxFeesSettings);
+      if (sanitized === undefined) {
+        const { taxFeesSettings, ...rest } = body;
+        return rest;
+      }
+      return { ...body, taxFeesSettings: sanitized };
+    }
+    return body;
+  }
+
   router.put("/business", requireAuth, async (req: Request, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
@@ -108,7 +154,7 @@ pool.query(`
         return res.status(404).json({ message: "Business not found" });
       }
 
-      const updated = await updateBusiness(business.id, req.body);
+      const updated = await updateBusiness(business.id, withSanitizedBody(req.body));
       return res.json(formatBusiness(updated));
     } catch (error: any) {
       console.error("Update business error:", error);
@@ -123,7 +169,7 @@ pool.query(`
         return res.status(404).json({ message: "Business not found" });
       }
 
-      const updated = await updateBusiness(business.id, req.body);
+      const updated = await updateBusiness(business.id, withSanitizedBody(req.body));
       return res.json(formatBusiness(updated));
     } catch (error: any) {
       console.error("Update business error:", error);
@@ -745,6 +791,33 @@ pool.query(`
         await updateUser(user.id, { stripeCustomerId: customer.id } as any);
       }
 
+      // Duplicate-subscription guard: even if our local subscriptionTier
+      // hasn't been promoted yet (webhook lag, failed write, etc.), Stripe
+      // is the source of truth. If this customer already has an active
+      // or trialing subscription, do NOT spin up another one — return
+      // alreadyPro so the client treats them as subscribed. This prevents
+      // the case where a user taps "Subscribe" twice and ends up paying
+      // 2x the plan price once trials end.
+      try {
+        const existing = await (await getStripe())!.subscriptions.list({
+          customer: stripeCustomerId,
+          status: "all",
+          limit: 20,
+        });
+        const liveStatuses = new Set(["active", "trialing", "past_due", "unpaid"]);
+        const live = existing.data.filter((s) => liveStatuses.has(s.status));
+        if (live.length > 0) {
+          console.log(
+            `[create-checkout] user ${user.id} already has ${live.length} live Stripe sub(s); returning alreadyPro`,
+            live.map((s) => ({ id: s.id, status: s.status }))
+          );
+          return res.json({ alreadyPro: true, subscriptionId: live[0].id });
+        }
+      } catch (subListErr: any) {
+        // Don't block checkout on a Stripe read failure — log and continue.
+        console.error("[create-checkout] sub list pre-check failed:", subListErr?.message || subListErr);
+      }
+
       const host = req.get("host")!;
       const protocol = host.includes("localhost") ? "http" : "https";
 
@@ -1086,7 +1159,7 @@ pool.query(`
             const { tipId } = session.metadata;
             try {
               await pool.query(
-                `UPDATE tips SET status='paid', paid_at=NOW(), stripe_checkout_session_id=$1 WHERE id=$2`,
+                `UPDATE tips SET status='paid', paid_at=NOW(), stripe_session_id=$1 WHERE id=$2`,
                 [session.id, tipId]
               );
               // Also update job.tip_amount for quick reference
@@ -1545,7 +1618,11 @@ pool.query(`
     }
   });
 
-  router.get("/business/lead-capture-settings", requireAuth, requireGrowth, async (req: any, res: Response) => {
+  // NOTE: read is intentionally open to any authenticated owner — viewing
+  // your own Lead Capture URL and QR is core functionality, not a paid
+  // gate. The PUT below keeps `requireGrowth` so only paid tiers can
+  // change the slug (matches the "Customize Your URL — Growth/Pro" copy).
+  router.get("/business/lead-capture-settings", requireAuth, async (req: any, res: Response) => {
     try {
       const business = await getBusinessByOwner(req.session.userId!);
       if (!business) return res.status(404).json({ message: "Business not found" });
@@ -1642,28 +1719,44 @@ pool.query(`
       if (!business) return res.status(404).json({ message: "Business not found" });
       const ps = await getPricingByBusiness(business.id);
       const s: any = (ps?.settings as any) || {};
-      const missing: string[] = [];
-      let passed = 0;
-      const TOTAL = 4;
-      const FACTORY_NAMES = new Set(["standard","standard clean","deep clean","deep","move in/out","move in / out","move-in/move-out","move out","recurring","recurring clean"]);
 
       const hr = Number(s.hourlyRate ?? 0);
-      if (hr > 0 && hr !== 35 && hr !== 40 && hr !== 45) passed++;
+      const mt = Number(s.minimumTicket ?? 0);
+
+      // Self-healing backfill: if this owner has a pricing row with
+      // non-zero hourly rate AND minimum ticket but never got the
+      // pricingCustomizedAt marker (i.e. they saved before the marker
+      // existed), stamp it now. This makes the prod backfill happen
+      // for every existing user on their first page load — no manual
+      // migration required.
+      if (ps && !s.pricingCustomizedAt && hr > 0 && mt > 0) {
+        try {
+          const stamped = { ...s, pricingCustomizedAt: new Date().toISOString() };
+          await upsertPricingSettings(business.id, stamped);
+          s.pricingCustomizedAt = stamped.pricingCustomizedAt;
+        } catch (err) {
+          console.warn("[pricing-status] self-heal stamp failed:", err);
+        }
+      }
+
+      if (s.pricingCustomizedAt) {
+        return res.json({
+          configured: true,
+          missingItems: [],
+          completionPercent: 100,
+          usingDefaultPricing: false,
+        });
+      }
+
+      const missing: string[] = [];
+      let passed = 0;
+      const TOTAL = 2;
+
+      if (hr > 0) passed++;
       else missing.push("Hourly rate not set");
 
-      const mt = Number(s.minimumTicket ?? 0);
-      if (mt > 0 && mt !== 100 && mt !== 80) passed++;
+      if (mt > 0) passed++;
       else missing.push("Minimum ticket not set");
-
-      const serviceTypes: any[] = s.serviceTypes || [];
-      const hasCustomST = serviceTypes.some((st: any) => st?.name && !FACTORY_NAMES.has(st.name.trim().toLowerCase()));
-      if (hasCustomST) passed++;
-      else missing.push("Service type names not customized");
-
-      const addOns = s.addOnPrices || {};
-      const nonZero = Object.values(addOns).filter((v: any) => Number(v) > 0).length;
-      if (nonZero >= 3) passed++;
-      else missing.push(`Add-on prices not configured (${nonZero}/3 set)`);
 
       res.json({
         configured: passed === TOTAL,

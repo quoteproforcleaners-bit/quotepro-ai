@@ -198,11 +198,15 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-
 
       {{#hasMultipleOptions}}
       <div class="section-label">Choose Your Package</div>
-      {{optionsHtml}}
+      <div id="options-section" data-pricing>
+        {{optionsHtml}}
+      </div>
       {{/hasMultipleOptions}}
 
       {{#hasSingleOption}}
-      {{singleOptionHtml}}
+      <div id="options-section" data-pricing>
+        {{singleOptionHtml}}
+      </div>
       {{/hasSingleOption}}
 
       {{#hasAddOns}}
@@ -218,6 +222,14 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-
         {{lineItemsHtml}}
       </div>
       {{/hasLineItems}}
+
+      {{#hasFeeOrTax}}
+      <div class="line-items-section" id="taxFeeSection" style="margin-top:8px">
+        {{subtotalRowHtml}}
+        {{feeRowHtml}}
+        {{taxRowHtml}}
+      </div>
+      {{/hasFeeOrTax}}
 
       <div class="total-section">
         <div class="total-row">
@@ -471,18 +483,39 @@ function getSelectedAddons(){
   return result;
 }
 
+var taxFeeConfig=(function(){try{return {{taxFeeConfigJson}};}catch(e){return null;}})();
+function computeFeeForSubtotal(sub){
+  if(!taxFeeConfig||!taxFeeConfig.feeType||!taxFeeConfig.feeValue)return 0;
+  if(taxFeeConfig.feeType==="flat")return Math.max(0,Number(taxFeeConfig.feeValue)||0);
+  return Math.max(0,sub*(Number(taxFeeConfig.feeValue)/100));
+}
+function computeTaxForSubtotal(sub,fee){
+  if(!taxFeeConfig||!(taxFeeConfig.taxRate>0))return 0;
+  var base=taxFeeConfig.taxAppliesTo==="subtotal_plus_fee"?(sub+fee):sub;
+  return Math.max(0,base*Number(taxFeeConfig.taxRate));
+}
+function round2(n){return Math.round((Number(n)||0)*100)/100;}
 function updateTotals(){
   var opt=optionData.find(function(o){return o.key===selectedOption});
   var basePrice;
   if(optionData.length===0){basePrice=storedTotal;}
   else{basePrice=opt?opt.price:optionData.length===1?optionData[0].price:0;}
   var addonsTotal=getSelectedAddonsTotal();
-  var total=basePrice+addonsTotal;
+  var subtotal=basePrice+addonsTotal;
+  var feeAmount=round2(computeFeeForSubtotal(subtotal));
+  var taxAmount=round2(computeTaxForSubtotal(subtotal,feeAmount));
+  var total=round2(subtotal+feeAmount+taxAmount);
   var totalEl=document.getElementById("totalAmount");
   var acceptTotalEl=document.getElementById("acceptTotal");
   var modalTotalEl=document.getElementById("modalTotal");
   var acceptedTotalEl=document.getElementById("acceptedTotal");
   var totalAddonsNote=document.getElementById("totalAddonsNote");
+  var subtotalEl=document.getElementById("subtotalAmount");
+  var feeEl=document.getElementById("feeAmount");
+  var taxEl=document.getElementById("taxAmount");
+  if(subtotalEl)subtotalEl.textContent="$"+subtotal.toFixed(2);
+  if(feeEl)feeEl.textContent="$"+feeAmount.toFixed(2);
+  if(taxEl)taxEl.textContent="$"+taxAmount.toFixed(2);
   if(totalEl)totalEl.textContent="$"+total.toFixed(2);
   if(acceptTotalEl)acceptTotalEl.textContent="$"+total.toFixed(2);
   if(modalTotalEl)modalTotalEl.textContent="$"+total.toFixed(2);
@@ -696,6 +729,797 @@ function trackEvent(name,data){
 document.querySelectorAll(".modal-overlay").forEach(function(m){
   m.addEventListener("click",function(e){if(e.target===m)closeModals()});
 });
+</script>
+
+<!-- ─── AI Concierge Widget ───────────────────────────────────────── -->
+<style>
+  #qpc-root{position:fixed;right:20px;bottom:20px;z-index:9999;font-family:-apple-system,BlinkMacSystemFont,'Inter',system-ui,sans-serif}
+  @media(max-width:640px){#qpc-root{right:12px;left:12px;bottom:12px}}
+  #qpc-launch{display:flex;align-items:center;gap:10px;padding:0 20px;min-height:48px;border-radius:999px;border:none;cursor:pointer;background:rgba(255,255,255,0.82);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);box-shadow:0 8px 28px rgba(0,0,0,0.14),0 1px 0 rgba(255,255,255,0.6) inset;color:#0F172A;font-size:14px;font-weight:600;transition:transform .15s ease;font-family:inherit}
+  #qpc-launch:hover{transform:translateY(-1px)}
+  #qpc-launch .qpc-dot{width:8px;height:8px;border-radius:50%;background:{{brandColor}};box-shadow:0 0 0 0 {{brandColor}};animation:qpcPulse 2s infinite}
+  @keyframes qpcPulse{0%{box-shadow:0 0 0 0 {{brandColor}}66}70%{box-shadow:0 0 0 10px {{brandColor}}00}100%{box-shadow:0 0 0 0 {{brandColor}}00}}
+  #qpc-nudge{position:absolute;right:0;bottom:64px;max-width:280px;padding:12px 14px 12px 16px;border-radius:18px;background:rgba(255,255,255,0.94);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);box-shadow:0 14px 38px rgba(0,0,0,0.18),0 1px 0 rgba(255,255,255,0.6) inset;font-size:13px;line-height:1.4;color:#0F172A;cursor:pointer;display:none;animation:qpcSlideIn .35s ease;border:1px solid rgba(255,255,255,0.5)}
+  @keyframes qpcSlideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  #qpc-nudge.qpc-show{display:block}
+  #qpc-nudge .qpc-nudge-x{position:absolute;top:4px;right:6px;background:transparent;border:none;color:#94A3B8;cursor:pointer;font-size:16px;width:22px;height:22px;border-radius:50%;line-height:1}
+  #qpc-nudge .qpc-nudge-x:hover{background:rgba(0,0,0,0.06)}
+  #qpc-panel{display:none;flex-direction:column;width:380px;max-width:calc(100vw - 24px);height:580px;max-height:calc(100vh - 40px);border-radius:24px;overflow:hidden;background:rgba(255,255,255,0.86);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);box-shadow:0 20px 60px rgba(0,0,0,0.22),0 1px 0 rgba(255,255,255,0.6) inset;border:1px solid rgba(255,255,255,0.4)}
+  @media(max-width:640px){#qpc-panel{width:100%;height:82vh}}
+  #qpc-panel.qpc-open{display:flex}
+  #qpc-header{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.06)}
+  #qpc-header .qpc-title{font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em}
+  #qpc-header .qpc-sub{font-size:12px;color:#64748B;margin-top:2px}
+  #qpc-close{background:transparent;border:none;width:44px;height:44px;border-radius:50%;cursor:pointer;color:#64748B;font-size:24px;line-height:1;display:flex;align-items:center;justify-content:center;margin:-7px}
+  #qpc-close:hover{background:rgba(0,0,0,0.06);color:#0F172A}
+  #qpc-thread{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+  .qpc-msg{max-width:84%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.45;word-wrap:break-word;white-space:pre-wrap}
+  .qpc-msg.qpc-u{align-self:flex-end;background:{{brandColor}};color:#fff;border-bottom-right-radius:6px}
+  .qpc-msg.qpc-a{align-self:flex-start;background:rgba(241,245,249,0.95);color:#0F172A;border-bottom-left-radius:6px}
+  .qpc-msg.qpc-typing{align-self:flex-start;background:rgba(241,245,249,0.95);color:#64748B}
+  .qpc-msg.qpc-typing .qpc-dots{display:inline-flex;gap:3px}
+  .qpc-msg.qpc-typing .qpc-dots span{width:6px;height:6px;border-radius:50%;background:#94A3B8;animation:qpcDot 1.2s infinite ease-in-out}
+  .qpc-msg.qpc-typing .qpc-dots span:nth-child(2){animation-delay:.15s}
+  .qpc-msg.qpc-typing .qpc-dots span:nth-child(3){animation-delay:.3s}
+  @keyframes qpcDot{0%,80%,100%{opacity:0.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+  /* Offer card */
+  .qpc-card{align-self:stretch;width:100%;border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,0.95),rgba(248,250,252,0.95));border:1.5px solid {{brandColor}}33;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,0.06)}
+  .qpc-card-label{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:{{brandColor}};font-weight:700;margin-bottom:6px}
+  .qpc-card-just{font-size:13px;color:#475569;line-height:1.45;margin-bottom:10px}
+  .qpc-card-prices{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+  .qpc-card-prices .qpc-was{font-size:13px;color:#94A3B8;text-decoration:line-through}
+  .qpc-card-prices .qpc-now{font-size:24px;font-weight:700;color:#0F172A;letter-spacing:-0.02em}
+  .qpc-card-prices .qpc-pct{font-size:11px;font-weight:600;color:#16A34A;background:#DCFCE7;padding:3px 8px;border-radius:999px}
+  .qpc-card-cta{display:block;width:100%;min-height:44px;background:{{brandColor}};color:#fff;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:filter .15s ease}
+  .qpc-card-cta:hover{filter:brightness(1.08)}
+  .qpc-card-cta:disabled{opacity:0.6;cursor:not-allowed}
+  .qpc-card-accepted{padding:10px 12px;background:#DCFCE7;color:#15803D;border-radius:12px;font-size:13px;font-weight:600;text-align:center}
+  /* Comparison card */
+  .qpc-comp-title{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:10px}
+  .qpc-comp-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:8px 0;border-top:1px solid rgba(0,0,0,0.06);font-size:13px;align-items:center}
+  .qpc-comp-row:first-of-type{border-top:none;padding-top:4px}
+  .qpc-comp-label{color:#475569}
+  .qpc-comp-us,.qpc-comp-them{font-size:12px;padding:3px 8px;border-radius:8px;font-weight:600;text-align:center;min-width:56px}
+  .qpc-comp-us{background:{{brandColor}}1A;color:{{brandColor}}}
+  .qpc-comp-them{background:#F1F5F9;color:#64748B}
+  /* Prompts */
+  #qpc-prompts{padding:10px 16px 6px;display:flex;flex-wrap:wrap;gap:6px;border-top:1px solid rgba(0,0,0,0.06)}
+  #qpc-prompts.qpc-hidden{display:none}
+  #qpc-powered{padding:6px 16px 8px;text-align:center;font-size:10px;color:#94A3B8;letter-spacing:0.04em;text-transform:uppercase;font-weight:600;border-top:1px solid rgba(0,0,0,0.04)}
+  #qpc-powered.qpc-hidden{display:none}
+  .qpc-slots{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .qpc-slot{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(255,255,255,0.6);border:1px solid rgba(0,0,0,0.06);border-radius:12px;font-size:13px;color:#0F172A;cursor:pointer;font-family:inherit;text-align:left}
+  .qpc-slot:hover{background:rgba(255,255,255,0.95)}
+  .qpc-slot:disabled{opacity:0.55;cursor:not-allowed}
+  .qpc-chip{padding:0 14px;min-height:36px;border-radius:999px;background:rgba(255,255,255,0.85);border:1px solid rgba(0,0,0,0.08);font-size:12px;color:#334155;cursor:pointer;transition:all .12s ease;font-family:inherit;display:inline-flex;align-items:center}
+  .qpc-chip:hover{background:#fff;border-color:{{brandColor}};color:{{brandColor}}}
+  #qpc-input-row{padding:12px 14px 14px;display:flex;gap:8px;align-items:flex-end;border-top:1px solid rgba(0,0,0,0.06);background:rgba(255,255,255,0.55)}
+  #qpc-input{flex:1;border:1px solid rgba(0,0,0,0.1);border-radius:18px;padding:11px 14px;font-size:14px;font-family:inherit;background:#fff;resize:none;outline:none;max-height:88px;line-height:1.4;min-height:44px}
+  #qpc-input:focus{border-color:{{brandColor}};box-shadow:0 0 0 3px {{brandColor}}22}
+  #qpc-send{background:{{brandColor}};color:#fff;border:none;width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .12s,transform .12s}
+  #qpc-send:hover:not(:disabled){transform:scale(1.05)}
+  #qpc-send:disabled{opacity:0.45;cursor:not-allowed}
+  #qpc-empty{padding:22px 18px 8px;text-align:center;color:#64748B;font-size:13px;line-height:1.5}
+  #qpc-empty strong{color:#0F172A;font-weight:600;display:block;font-size:15px;margin-bottom:4px}
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce){
+    #qpc-launch{transition:none}
+    #qpc-launch .qpc-dot{animation:none}
+    #qpc-nudge{animation:none}
+    .qpc-msg.qpc-typing .qpc-dots span{animation:none;opacity:0.6}
+    #qpc-send{transition:none}
+    #qpc-send:hover:not(:disabled){transform:none}
+    #qpc-thread{scroll-behavior:auto}
+  }
+  /* Dark mode */
+  @media (prefers-color-scheme: dark){
+    #qpc-launch{background:rgba(28,32,40,0.86);color:#F1F5F9;box-shadow:0 8px 28px rgba(0,0,0,0.5),0 1px 0 rgba(255,255,255,0.06) inset}
+    #qpc-nudge{background:rgba(28,32,40,0.94);color:#F1F5F9;border-color:rgba(255,255,255,0.08);box-shadow:0 14px 38px rgba(0,0,0,0.5)}
+    #qpc-nudge .qpc-nudge-x{color:#64748B}
+    #qpc-nudge .qpc-nudge-x:hover{background:rgba(255,255,255,0.06)}
+    #qpc-panel{background:rgba(20,24,32,0.92);border-color:rgba(255,255,255,0.06);box-shadow:0 20px 60px rgba(0,0,0,0.6),0 1px 0 rgba(255,255,255,0.05) inset}
+    #qpc-header{border-bottom-color:rgba(255,255,255,0.08)}
+    #qpc-header .qpc-title{color:#F1F5F9}
+    #qpc-header .qpc-sub{color:#94A3B8}
+    #qpc-close{color:#94A3B8}
+    #qpc-close:hover{background:rgba(255,255,255,0.08);color:#F1F5F9}
+    .qpc-msg.qpc-a{background:rgba(45,52,65,0.95);color:#F1F5F9}
+    .qpc-msg.qpc-typing{background:rgba(45,52,65,0.95)}
+    .qpc-card{background:linear-gradient(135deg,rgba(34,40,52,0.95),rgba(28,32,42,0.95));border-color:{{brandColor}}55}
+    .qpc-card-just{color:#CBD5E1}
+    .qpc-card-prices .qpc-now{color:#F1F5F9}
+    .qpc-card-prices .qpc-was{color:#64748B}
+    .qpc-card-accepted{background:#14532D;color:#86EFAC}
+    .qpc-comp-title{color:#F1F5F9}
+    .qpc-comp-row{border-top-color:rgba(255,255,255,0.08)}
+    .qpc-comp-label{color:#CBD5E1}
+    .qpc-comp-them{background:rgba(255,255,255,0.06);color:#94A3B8}
+    #qpc-prompts{border-top-color:rgba(255,255,255,0.08)}
+    .qpc-chip{background:rgba(45,52,65,0.85);border-color:rgba(255,255,255,0.1);color:#CBD5E1}
+    .qpc-chip:hover{background:rgba(60,70,90,0.95);color:#fff}
+    #qpc-input-row{border-top-color:rgba(255,255,255,0.08);background:rgba(20,24,32,0.6)}
+    #qpc-input{background:rgba(45,52,65,0.95);color:#F1F5F9;border-color:rgba(255,255,255,0.1)}
+    #qpc-empty{color:#94A3B8}
+    #qpc-empty strong{color:#F1F5F9}
+  }
+</style>
+<div id="qpc-root">
+  <div id="qpc-nudge" role="button" aria-label="AI suggestion">
+    <button class="qpc-nudge-x" type="button" aria-label="Dismiss">&times;</button>
+    <span id="qpc-nudge-text"></span>
+  </div>
+  <button id="qpc-launch" type="button" aria-label="Open AI concierge">
+    <span class="qpc-dot"></span><span id="qpc-launch-label">Ask AI about this quote</span>
+  </button>
+  <div id="qpc-panel" role="dialog" aria-label="AI Concierge">
+    <div id="qpc-header">
+      <div>
+        <div class="qpc-title" id="qpc-title-text">{{companyName}} Concierge</div>
+        <div class="qpc-sub" id="qpc-sub-text">Here to answer questions about your quote</div>
+      </div>
+      <button id="qpc-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div id="qpc-thread">
+      <div id="qpc-empty">
+        <strong id="qpc-empty-h">Hi there</strong>
+        <span id="qpc-empty-b">Ask me anything about this quote &mdash; what's included, scheduling, or how to compare options.</span>
+      </div>
+    </div>
+    <div id="qpc-prompts"></div>
+    <div id="qpc-input-row">
+      <textarea id="qpc-input" rows="1" placeholder="Type a question..." maxlength="1000"></textarea>
+      <button id="qpc-send" type="button" aria-label="Send" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+    <div id="qpc-powered" class="qpc-hidden" aria-hidden="true">Powered by QuotePro</div>
+  </div>
+</div>
+<script>
+(function(){
+  var TOKEN="{{publicToken}}";
+  var API="/api/q/"+TOKEN+"/ai";
+  var ACCEPT_API="/api/public/quote/"+TOKEN+"/respond";
+  var launch=document.getElementById("qpc-launch");
+  var panel=document.getElementById("qpc-panel");
+  var closeBtn=document.getElementById("qpc-close");
+  var thread=document.getElementById("qpc-thread");
+  var promptsEl=document.getElementById("qpc-prompts");
+  var input=document.getElementById("qpc-input");
+  var send=document.getElementById("qpc-send");
+  var empty=document.getElementById("qpc-empty");
+  var nudgeEl=document.getElementById("qpc-nudge");
+  var nudgeText=document.getElementById("qpc-nudge-text");
+  var nudgeX=nudgeEl.querySelector(".qpc-nudge-x");
+  var titleEl=document.getElementById("qpc-title-text");
+  var subEl=document.getElementById("qpc-sub-text");
+  var emptyH=document.getElementById("qpc-empty-h");
+  var emptyB=document.getElementById("qpc-empty-b");
+  var launchLabel=document.getElementById("qpc-launch-label");
+  var poweredEl=document.getElementById("qpc-powered");
+  var sessionId=null;
+  var initialized=false;
+  var sending=false;
+  var lang="en";
+  var lastConversationId=null;
+  var nudgeTimer=null;
+  var nudgeShown=false;
+  var widgetOpened=false;
+  var isPostAcceptance=false;
+
+  var STR={
+    en:{
+      title_postaccept:"Your Concierge",
+      sub_postaccept:"Here to help you prep for your cleaning",
+      empty_h_postaccept:"Welcome aboard!",
+      empty_b_postaccept:"Ask me anything about preparing for your cleaning, scheduling, or what to expect.",
+      empty_h:"Hi there",
+      empty_b:"Ask me anything about this quote \u2014 what's included, scheduling, or how to compare options.",
+      launch:"Ask AI about this quote",
+      launch_postaccept:"Ask your concierge",
+      send_err:"Sorry, something went wrong. Please try again.",
+      placeholder:"Type a question...",
+      offer_label:"Special offer",
+      accept_cta:"Accept $",
+      accept_processing:"Accepting...",
+      accept_done:"Accepted! Reloading...",
+      vs:"vs",
+      addon_label:"Add to your booking",
+      addon_cta:"Add for $",
+      addon_processing:"Adding...",
+      addon_done:"Added! New total $",
+      reschedule_label:"Reschedule your cleaning",
+      reschedule_cta:"Pick this time",
+      reschedule_processing:"Rescheduling...",
+      reschedule_done:"Rescheduled!",
+      approval_pending:"I\u2019ve sent your request to the owner for approval. You\u2019ll get an email once they respond.",
+      powered:"Powered by QuotePro"
+    },
+    es:{
+      title_postaccept:"Tu Concierge",
+      sub_postaccept:"Aqu\u00ed para ayudarte a preparar tu limpieza",
+      empty_h_postaccept:"\u00a1Bienvenido!",
+      empty_b_postaccept:"Preg\u00fantame lo que quieras sobre c\u00f3mo prepararte, fechas o qu\u00e9 esperar.",
+      empty_h:"Hola",
+      empty_b:"Preg\u00fantame sobre tu cotizaci\u00f3n: qu\u00e9 incluye, horarios o c\u00f3mo comparar opciones.",
+      launch:"Preguntar a la IA",
+      launch_postaccept:"Pregunta a tu concierge",
+      send_err:"Algo sali\u00f3 mal. Por favor intenta de nuevo.",
+      placeholder:"Escribe tu pregunta...",
+      offer_label:"Oferta especial",
+      accept_cta:"Aceptar $",
+      accept_processing:"Aceptando...",
+      accept_done:"\u00a1Aceptado! Recargando...",
+      vs:"vs",
+      addon_label:"A\u00f1ade a tu reserva",
+      addon_cta:"A\u00f1adir por $",
+      addon_processing:"A\u00f1adiendo...",
+      addon_done:"\u00a1A\u00f1adido! Nuevo total $",
+      reschedule_label:"Reprograma tu limpieza",
+      reschedule_cta:"Elegir esta hora",
+      reschedule_processing:"Reprogramando...",
+      reschedule_done:"\u00a1Reprogramado!",
+      approval_pending:"He enviado tu solicitud al propietario para su aprobaci\u00f3n. Recibir\u00e1s un correo cuando responda.",
+      powered:"Con tecnolog\u00eda de QuotePro"
+    },
+    pt:{
+      title_postaccept:"Seu Concierge",
+      sub_postaccept:"Aqui para ajud\u00e1-lo a preparar sua limpeza",
+      empty_h_postaccept:"Bem-vindo!",
+      empty_b_postaccept:"Pergunte qualquer coisa sobre prepara\u00e7\u00e3o, agenda ou o que esperar.",
+      empty_h:"Ol\u00e1",
+      empty_b:"Pergunte sobre este or\u00e7amento \u2014 o que inclui, agenda ou como comparar op\u00e7\u00f5es.",
+      launch:"Pergunte \u00e0 IA",
+      launch_postaccept:"Fale com seu concierge",
+      send_err:"Algo deu errado. Tente novamente.",
+      placeholder:"Digite sua pergunta...",
+      offer_label:"Oferta especial",
+      accept_cta:"Aceitar $",
+      accept_processing:"Aceitando...",
+      accept_done:"Aceito! Recarregando...",
+      vs:"vs",
+      addon_label:"Adicione \u00e0 sua reserva",
+      addon_cta:"Adicionar por $",
+      addon_processing:"Adicionando...",
+      addon_done:"Adicionado! Novo total $",
+      reschedule_label:"Reagende sua limpeza",
+      reschedule_cta:"Escolher este hor\u00e1rio",
+      reschedule_processing:"Reagendando...",
+      reschedule_done:"Reagendado!",
+      approval_pending:"Enviei sua solicita\u00e7\u00e3o ao propriet\u00e1rio para aprova\u00e7\u00e3o. Voc\u00ea receber\u00e1 um email com a resposta.",
+      powered:"Desenvolvido por QuotePro"
+    },
+    fr:{
+      title_postaccept:"Votre Concierge",
+      sub_postaccept:"Ici pour vous aider \u00e0 pr\u00e9parer votre nettoyage",
+      empty_h_postaccept:"Bienvenue !",
+      empty_b_postaccept:"Posez-moi vos questions sur la pr\u00e9paration, le calendrier ou ce \u00e0 quoi vous attendre.",
+      empty_h:"Bonjour",
+      empty_b:"Posez-moi vos questions sur ce devis \u2014 inclus, calendrier ou comparaison.",
+      launch:"Demander \u00e0 l\u2019IA",
+      launch_postaccept:"Parler \u00e0 votre concierge",
+      send_err:"D\u00e9sol\u00e9, une erreur s\u2019est produite. Veuillez r\u00e9essayer.",
+      placeholder:"Tapez une question...",
+      offer_label:"Offre sp\u00e9ciale",
+      accept_cta:"Accepter $",
+      accept_processing:"Acceptation...",
+      accept_done:"Accept\u00e9 ! Rechargement...",
+      vs:"vs",
+      addon_label:"Ajouter \u00e0 votre r\u00e9servation",
+      addon_cta:"Ajouter pour $",
+      addon_processing:"Ajout...",
+      addon_done:"Ajout\u00e9 ! Nouveau total $",
+      reschedule_label:"Reprogrammer votre nettoyage",
+      reschedule_cta:"Choisir ce cr\u00e9neau",
+      reschedule_processing:"Reprogrammation...",
+      reschedule_done:"Reprogramm\u00e9 !",
+      approval_pending:"J\u2019ai envoy\u00e9 votre demande au propri\u00e9taire pour approbation. Vous recevrez un email d\u00e8s qu\u2019il r\u00e9pond.",
+      powered:"Propuls\u00e9 par QuotePro"
+    },
+    zh:{
+      title_postaccept:"\u4f60\u7684\u793c\u5bbe",
+      sub_postaccept:"\u5e2e\u52a9\u4f60\u51c6\u5907\u6e05\u6d01",
+      empty_h_postaccept:"\u6b22\u8fce\uff01",
+      empty_b_postaccept:"\u968f\u65f6\u95ee\u6211\u5173\u4e8e\u51c6\u5907\u3001\u65f6\u95f4\u5b89\u6392\u6216\u671f\u5f85\u7684\u95ee\u9898\u3002",
+      empty_h:"\u4f60\u597d",
+      empty_b:"\u95ee\u6211\u4efb\u4f55\u5173\u4e8e\u62a5\u4ef7\u7684\u95ee\u9898 \u2014 \u5305\u542b\u54ea\u4e9b\u3001\u65f6\u95f4\u5b89\u6392\u6216\u5982\u4f55\u6bd4\u8f83\u9009\u9879\u3002",
+      launch:"\u95ee AI",
+      launch_postaccept:"\u8054\u7cfb\u793c\u5bbe",
+      send_err:"\u62b1\u6b49\uff0c\u51fa\u73b0\u9519\u8bef\u3002\u8bf7\u91cd\u8bd5\u3002",
+      placeholder:"\u8f93\u5165\u95ee\u9898...",
+      offer_label:"\u7279\u522b\u4f18\u60e0",
+      accept_cta:"\u63a5\u53d7 $",
+      accept_processing:"\u5904\u7406\u4e2d...",
+      accept_done:"\u5df2\u63a5\u53d7\uff01\u91cd\u65b0\u52a0\u8f7d...",
+      vs:"vs",
+      addon_label:"\u6dfb\u52a0\u5230\u9884\u8ba2",
+      addon_cta:"\u6dfb\u52a0 $",
+      addon_processing:"\u6dfb\u52a0\u4e2d...",
+      addon_done:"\u5df2\u6dfb\u52a0\uff01\u65b0\u603b\u989d $",
+      reschedule_label:"\u91cd\u65b0\u5b89\u6392",
+      reschedule_cta:"\u9009\u62e9\u6b64\u65f6\u95f4",
+      reschedule_processing:"\u5904\u7406\u4e2d...",
+      reschedule_done:"\u5df2\u91cd\u65b0\u5b89\u6392\uff01",
+      approval_pending:"\u6211\u5df2\u5c06\u4f60\u7684\u8bf7\u6c42\u53d1\u9001\u7ed9\u4e1a\u4e3b\u5ba1\u6279\u3002\u4e1a\u4e3b\u56de\u590d\u540e\u4f60\u4f1a\u6536\u5230\u90ae\u4ef6\u3002",
+      powered:"\u7531 QuotePro \u63d0\u4f9b"
+    },
+    vi:{
+      title_postaccept:"Concierge c\u1ee7a b\u1ea1n",
+      sub_postaccept:"S\u1eb5n s\u00e0ng gi\u00fap b\u1ea1n chu\u1ea9n b\u1ecb cho bu\u1ed5i d\u1ecdn d\u1eb9p",
+      empty_h_postaccept:"Ch\u00e0o m\u1eebng!",
+      empty_b_postaccept:"H\u1ecfi b\u1ea5t k\u1ef3 \u0111i\u1ec1u g\u00ec v\u1ec1 chu\u1ea9n b\u1ecb, l\u1ecbch ho\u1eb7c nh\u1eefng g\u00ec mong \u0111\u1ee3i.",
+      empty_h:"Ch\u00e0o b\u1ea1n",
+      empty_b:"H\u1ecfi v\u1ec1 b\u00e1o gi\u00e1 n\u00e0y \u2014 g\u1ed3m nh\u1eefng g\u00ec, l\u1ecbch ho\u1eb7c c\u00e1ch so s\u00e1nh.",
+      launch:"H\u1ecfi AI",
+      launch_postaccept:"Li\u00ean h\u1ec7 concierge",
+      send_err:"Xin l\u1ed7i, c\u00f3 l\u1ed7i x\u1ea3y ra. Vui l\u00f2ng th\u1eed l\u1ea1i.",
+      placeholder:"Nh\u1eadp c\u00e2u h\u1ecfi...",
+      offer_label:"\u01afu \u0111\u00e3i \u0111\u1eb7c bi\u1ec7t",
+      accept_cta:"Ch\u1ea5p nh\u1eadn $",
+      accept_processing:"\u0110ang x\u1eed l\u00fd...",
+      accept_done:"\u0110\u00e3 ch\u1ea5p nh\u1eadn! \u0110ang t\u1ea3i l\u1ea1i...",
+      vs:"vs",
+      addon_label:"Th\u00eam v\u00e0o \u0111\u1eb7t l\u1ecbch",
+      addon_cta:"Th\u00eam v\u1edbi gi\u00e1 $",
+      addon_processing:"\u0110ang th\u00eam...",
+      addon_done:"\u0110\u00e3 th\u00eam! T\u1ed5ng m\u1edbi $",
+      reschedule_label:"\u0110\u1ed5i l\u1ecbch d\u1ecdn d\u1eb9p",
+      reschedule_cta:"Ch\u1ecdn gi\u1edd n\u00e0y",
+      reschedule_processing:"\u0110ang \u0111\u1ed5i...",
+      reschedule_done:"\u0110\u00e3 \u0111\u1ed5i l\u1ecbch!",
+      approval_pending:"T\u00f4i \u0111\u00e3 g\u1eedi y\u00eau c\u1ea7u cho ch\u1ee7 \u0111\u1ec3 ph\u00ea duy\u1ec7t. B\u1ea1n s\u1ebd nh\u1eadn email khi h\u1ecd ph\u1ea3n h\u1ed3i.",
+      powered:"Cung c\u1ea5p b\u1edfi QuotePro"
+    },
+    tl:{
+      title_postaccept:"Iyong Concierge",
+      sub_postaccept:"Nandito para tulungan kang maghanda sa paglilinis",
+      empty_h_postaccept:"Maligayang pagdating!",
+      empty_b_postaccept:"Magtanong tungkol sa paghahanda, iskedyul, o ano ang aasahan.",
+      empty_h:"Kumusta",
+      empty_b:"Magtanong tungkol sa quote na ito \u2014 ano ang kasama, iskedyul, o paghahambing.",
+      launch:"Tanungin ang AI",
+      launch_postaccept:"Tanungin ang concierge",
+      send_err:"Pasensya na, may nangyaring mali. Pakisubukang muli.",
+      placeholder:"Mag-type ng tanong...",
+      offer_label:"Espesyal na alok",
+      accept_cta:"Tanggapin $",
+      accept_processing:"Tinatanggap...",
+      accept_done:"Tinanggap! Nire-reload...",
+      vs:"vs",
+      addon_label:"Idagdag sa booking",
+      addon_cta:"Idagdag sa $",
+      addon_processing:"Idinadagdag...",
+      addon_done:"Naidagdag! Bagong kabuuan $",
+      reschedule_label:"Mag-reschedule",
+      reschedule_cta:"Piliin ang oras na ito",
+      reschedule_processing:"Nagre-reschedule...",
+      reschedule_done:"Na-reschedule!",
+      approval_pending:"Naipadala ko na ang iyong kahilingan sa may-ari para aprubahan. Makakatanggap ka ng email kapag tumugon.",
+      powered:"Pinagana ng QuotePro"
+    },
+    ko:{
+      title_postaccept:"\ub2f9\uc2e0\uc758 \ucf58\uc2dc\uc5b4\uc9c0",
+      sub_postaccept:"\uccad\uc18c \uc900\ube44\ub97c \ub3c4\uc640\ub4dc\ub9bd\ub2c8\ub2e4",
+      empty_h_postaccept:"\ud658\uc601\ud569\ub2c8\ub2e4!",
+      empty_b_postaccept:"\uc900\ube44, \uc77c\uc815, \ub610\ub294 \uc608\uc0c1\ub418\ub294 \uc0ac\ud56d\uc5d0 \ub300\ud574 \ubb3c\uc5b4\ubcf4\uc138\uc694.",
+      empty_h:"\uc548\ub155\ud558\uc138\uc694",
+      empty_b:"\uc774 \uacac\uc801\uc5d0 \ub300\ud574 \ubb3c\uc5b4\ubcf4\uc138\uc694 \u2014 \ud3ec\ud568 \uc0ac\ud56d, \uc77c\uc815, \ube44\uad50 \ubc29\ubc95.",
+      launch:"AI\uc5d0\uac8c \ubb3c\uc5b4\ubcf4\uae30",
+      launch_postaccept:"\ucf58\uc2dc\uc5b4\uc9c0\uc5d0\uac8c \ubb3c\uc5b4\ubcf4\uae30",
+      send_err:"\uc8c4\uc1a1\ud569\ub2c8\ub2e4. \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.",
+      placeholder:"\uc9c8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694...",
+      offer_label:"\ud2b9\ubcc4 \ud560\uc778",
+      accept_cta:"\uc218\ub77d $",
+      accept_processing:"\ucc98\ub9ac \uc911...",
+      accept_done:"\uc218\ub77d\ub418\uc5c8\uc2b5\ub2c8\ub2e4! \ub2e4\uc2dc \ub85c\ub4dc \uc911...",
+      vs:"vs",
+      addon_label:"\uc608\uc57d\uc5d0 \ucd94\uac00",
+      addon_cta:"$ \uc5d0 \ucd94\uac00",
+      addon_processing:"\ucd94\uac00 \uc911...",
+      addon_done:"\ucd94\uac00\ub428! \uc0c8 \ucd1d\uc561 $",
+      reschedule_label:"\uc7ac\uc608\uc57d",
+      reschedule_cta:"\uc774 \uc2dc\uac04 \uc120\ud0dd",
+      reschedule_processing:"\uc7ac\uc608\uc57d \uc911...",
+      reschedule_done:"\uc7ac\uc608\uc57d \uc644\ub8cc!",
+      approval_pending:"\uc6d4\ub108\uc5d0\uac8c \uc2b9\uc778 \uc694\uccad\uc744 \ubcf4\ub0c8\uc2b5\ub2c8\ub2e4. \uc751\ub2f5\ud558\uba74 \uc774\uba54\uc77c\uc744 \ubc1b\uac8c \ub429\ub2c8\ub2e4.",
+      powered:"QuotePro \uc81c\uacf5"
+    }
+  };
+  function s(k){ return (STR[lang]&&STR[lang][k])||STR.en[k]||k; }
+
+  try{ sessionId=localStorage.getItem("qpc_sid_"+TOKEN)||null; }catch(e){}
+
+  function setSending(v){ sending=v; send.disabled=v||!input.value.trim(); input.disabled=v; }
+  function autosize(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,88)+"px"; send.disabled=sending||!input.value.trim(); }
+  function applyLanguage(){
+    input.placeholder=s("placeholder");
+    if(isPostAcceptance){
+      titleEl.textContent=s("title_postaccept");
+      subEl.textContent=s("sub_postaccept");
+      emptyH.textContent=s("empty_h_postaccept");
+      emptyB.textContent=s("empty_b_postaccept");
+      launchLabel.textContent=s("launch_postaccept");
+    } else {
+      emptyH.textContent=s("empty_h");
+      emptyB.textContent=s("empty_b");
+      launchLabel.textContent=s("launch");
+    }
+    if(poweredEl) poweredEl.textContent=s("powered");
+  }
+
+  function renderPrompts(arr){
+    promptsEl.innerHTML="";
+    if(!arr||!arr.length){ promptsEl.classList.add("qpc-hidden"); return; }
+    promptsEl.classList.remove("qpc-hidden");
+    arr.forEach(function(p){
+      var b=document.createElement("button");
+      b.type="button"; b.className="qpc-chip"; b.textContent=p;
+      b.addEventListener("click",function(){ sendMessage(p,"suggested_prompt"); });
+      promptsEl.appendChild(b);
+    });
+  }
+  function clearEmpty(){
+    if(empty&&empty.parentNode){ empty.parentNode.removeChild(empty); empty=null; }
+  }
+  function appendMsg(role,text,opts){
+    clearEmpty();
+    var d=document.createElement("div");
+    d.className="qpc-msg qpc-"+(role==="user"?"u":"a")+(opts&&opts.typing?" qpc-typing":"");
+    if(opts&&opts.typing){
+      d.innerHTML='<span class="qpc-dots"><span></span><span></span><span></span></span>';
+    } else {
+      d.textContent=text;
+    }
+    thread.appendChild(d);
+    thread.scrollTop=thread.scrollHeight;
+    return d;
+  }
+  function appendOfferCard(payload){
+    clearEmpty();
+    var card=document.createElement("div");
+    card.className="qpc-card";
+    var label=document.createElement("div"); label.className="qpc-card-label"; label.textContent=s("offer_label");
+    var prices=document.createElement("div"); prices.className="qpc-card-prices";
+    var was=document.createElement("span"); was.className="qpc-was"; was.textContent="$"+(payload.originalTotal).toFixed(2);
+    var now=document.createElement("span"); now.className="qpc-now"; now.textContent="$"+(payload.offeredTotal).toFixed(2);
+    var pct=document.createElement("span"); pct.className="qpc-pct"; pct.textContent="\u2212"+payload.discountPct.toFixed(1)+"%";
+    prices.appendChild(was); prices.appendChild(now); prices.appendChild(pct);
+    var just=document.createElement("div"); just.className="qpc-card-just"; just.textContent=payload.justification||"";
+    var cta=document.createElement("button"); cta.type="button"; cta.className="qpc-card-cta";
+    cta.textContent=s("accept_cta")+(payload.offeredTotal).toFixed(2);
+    cta.addEventListener("click",function(){ acceptOffer(payload, cta, card); });
+    card.appendChild(label); card.appendChild(prices); card.appendChild(just); card.appendChild(cta);
+    thread.appendChild(card);
+    thread.scrollTop=thread.scrollHeight;
+    return card;
+  }
+  function appendAddonCard(payload){
+    clearEmpty();
+    var card=document.createElement("div");
+    card.className="qpc-card";
+    var label=document.createElement("div"); label.className="qpc-card-label"; label.textContent=s("addon_label");
+    var name=document.createElement("div"); name.className="qpc-card-just"; name.textContent=payload.addonName||payload.addonKey;
+    var prices=document.createElement("div"); prices.className="qpc-card-prices";
+    var was=document.createElement("span"); was.className="qpc-was"; was.textContent="$"+(Number(payload.currentTotal)||0).toFixed(2);
+    var now=document.createElement("span"); now.className="qpc-now"; now.textContent="$"+(Number(payload.newTotal)||0).toFixed(2);
+    prices.appendChild(was); prices.appendChild(now);
+    var cta=document.createElement("button"); cta.type="button"; cta.className="qpc-card-cta";
+    cta.textContent=s("addon_cta")+(Number(payload.price)||0).toFixed(2);
+    cta.addEventListener("click",function(){ confirmAddon(payload, cta, card); });
+    card.appendChild(label); card.appendChild(name); card.appendChild(prices); card.appendChild(cta);
+    thread.appendChild(card);
+    thread.scrollTop=thread.scrollHeight;
+    return card;
+  }
+  function appendRescheduleCard(payload){
+    clearEmpty();
+    var card=document.createElement("div");
+    card.className="qpc-card";
+    var label=document.createElement("div"); label.className="qpc-card-label"; label.textContent=s("reschedule_label");
+    card.appendChild(label);
+    var slotsWrap=document.createElement("div"); slotsWrap.className="qpc-slots";
+    (payload.slots||[]).forEach(function(slot){
+      var b=document.createElement("button");
+      b.type="button"; b.className="qpc-slot";
+      b.textContent=slot.label||slot.datetime;
+      b.addEventListener("click",function(){ confirmReschedule(slot, payload, b, card); });
+      slotsWrap.appendChild(b);
+    });
+    card.appendChild(slotsWrap);
+    thread.appendChild(card);
+    thread.scrollTop=thread.scrollHeight;
+    return card;
+  }
+  function confirmAddon(payload, btn, card){
+    btn.disabled=true;
+    btn.textContent=s("addon_processing");
+    fetch(API+"/add-addon",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({addonKey:payload.addonKey,conversationId:payload.conversationId||lastConversationId})
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(!res.ok){
+          btn.disabled=false;
+          btn.textContent=s("addon_cta")+(Number(payload.price)||0).toFixed(2);
+          appendMsg("assistant",(res.j&&res.j.message)||s("send_err"));
+          return;
+        }
+        btn.style.display="none";
+        var ok=document.createElement("div"); ok.className="qpc-card-accepted";
+        ok.textContent=s("addon_done")+(Number(res.j.newTotal||payload.newTotal)||0).toFixed(2);
+        card.appendChild(ok);
+      })
+      .catch(function(){
+        btn.disabled=false;
+        btn.textContent=s("addon_cta")+(Number(payload.price)||0).toFixed(2);
+        appendMsg("assistant",s("send_err"));
+      });
+  }
+  function confirmReschedule(slot, payload, btn, card){
+    var allBtns=card.querySelectorAll(".qpc-slot");
+    for(var i=0;i<allBtns.length;i++){ allBtns[i].disabled=true; }
+    btn.textContent=s("reschedule_processing");
+    fetch(API+"/reschedule",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({datetime:slot.datetime,conversationId:payload.conversationId||lastConversationId})
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(!res.ok){
+          for(var i=0;i<allBtns.length;i++){ allBtns[i].disabled=false; }
+          btn.textContent=slot.label||slot.datetime;
+          appendMsg("assistant",(res.j&&res.j.message)||s("send_err"));
+          return;
+        }
+        var ok=document.createElement("div"); ok.className="qpc-card-accepted"; ok.textContent=s("reschedule_done");
+        card.appendChild(ok);
+      })
+      .catch(function(){
+        for(var i=0;i<allBtns.length;i++){ allBtns[i].disabled=false; }
+        btn.textContent=slot.label||slot.datetime;
+        appendMsg("assistant",s("send_err"));
+      });
+  }
+  function appendComparisonCard(payload){
+    clearEmpty();
+    var card=document.createElement("div");
+    card.className="qpc-card";
+    var label=document.createElement("div"); label.className="qpc-card-label"; label.textContent=payload.competitor;
+    var title=document.createElement("div"); title.className="qpc-comp-title"; title.textContent=s("vs")+" "+payload.competitor;
+    card.appendChild(label); card.appendChild(title);
+    (payload.points||[]).forEach(function(p){
+      var row=document.createElement("div"); row.className="qpc-comp-row";
+      var l=document.createElement("div"); l.className="qpc-comp-label"; l.textContent=p.label;
+      var u=document.createElement("div"); u.className="qpc-comp-us"; u.textContent=p.us||"\u2713";
+      var t=document.createElement("div"); t.className="qpc-comp-them"; t.textContent=p.them||"\u2014";
+      row.appendChild(l); row.appendChild(u); row.appendChild(t);
+      card.appendChild(row);
+    });
+    thread.appendChild(card);
+    thread.scrollTop=thread.scrollHeight;
+    return card;
+  }
+
+  function acceptOffer(payload, btn, card){
+    btn.disabled=true;
+    btn.textContent=s("accept_processing");
+    fetch(API+"/accept-offer",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({offeredTotal:payload.offeredTotal,conversationId:payload.conversationId})
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(!res.ok){
+          btn.disabled=false;
+          btn.textContent=s("accept_cta")+(payload.offeredTotal).toFixed(2);
+          appendMsg("assistant",(res.j&&res.j.message)||s("send_err"));
+          return;
+        }
+        // Now POST to the public accept endpoint to actually accept the quote
+        return fetch(ACCEPT_API,{
+          method:"POST",
+          credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({action:"accept"})
+        }).then(function(r2){
+          if(!r2.ok) throw new Error("accept_failed");
+          // Show accepted state, reload page
+          btn.style.display="none";
+          var ok=document.createElement("div"); ok.className="qpc-card-accepted"; ok.textContent=s("accept_done");
+          card.appendChild(ok);
+          setTimeout(function(){ try{ window.location.reload(); }catch(e){} }, 900);
+        });
+      })
+      .catch(function(){
+        btn.disabled=false;
+        btn.textContent=s("accept_cta")+(payload.offeredTotal).toFixed(2);
+        appendMsg("assistant",s("send_err"));
+      });
+  }
+
+  function init(){
+    if(initialized) return;
+    initialized=true;
+    fetch(API+"/init",{credentials:"same-origin"})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(!j||j.enabled===false){ document.getElementById("qpc-root").style.display="none"; return; }
+        if(j.sessionId){ sessionId=j.sessionId; try{ localStorage.setItem("qpc_sid_"+TOKEN,sessionId); }catch(e){} }
+        if(j.isPostAcceptance){ isPostAcceptance=true; }
+        // T206: white-label gating — show "Powered by QuotePro" footer unless Pro
+        if(j.whitelabel===false && poweredEl){ poweredEl.classList.remove("qpc-hidden"); }
+        // T207: arm scroll-past-pricing trigger only if owner allows nudges
+        if(j.ownerCanProactiveNudge!==false){ armPricingScrollTrigger(); }
+        applyLanguage();
+        renderPrompts(j.suggestedPrompts||[]);
+        // Schedule the proactive nudge if we haven't shown one yet
+        scheduleNudge();
+      })
+      .catch(function(){});
+  }
+  function sendMessage(text,inputMethod){
+    text=(text||"").trim();
+    if(!text||sending) return;
+    appendMsg("user",text);
+    input.value=""; autosize();
+    setSending(true);
+    var typing=appendMsg("assistant","",{typing:true});
+    fetch(API+"/message",{
+      method:"POST",
+      credentials:"same-origin",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:text,sessionId:sessionId,inputMethod:inputMethod||"text"})
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(typing&&typing.parentNode) typing.parentNode.removeChild(typing);
+        if(!res.ok){
+          appendMsg("assistant",(res.j&&res.j.message)||s("send_err"));
+        } else {
+          if(res.j.sessionId){ sessionId=res.j.sessionId; try{ localStorage.setItem("qpc_sid_"+TOKEN,sessionId); }catch(e){} }
+          if(res.j.detectedLanguage&&res.j.detectedLanguage!==lang){ lang=res.j.detectedLanguage; applyLanguage(); }
+          if(res.j.conversationId) lastConversationId=res.j.conversationId;
+          if(res.j.contentType==="offer"&&res.j.structuredPayload){
+            if(res.j.content) appendMsg("assistant",res.j.content);
+            appendOfferCard(res.j.structuredPayload);
+          } else if(res.j.contentType==="comparison_card"&&res.j.structuredPayload){
+            if(res.j.content) appendMsg("assistant",res.j.content);
+            appendComparisonCard(res.j.structuredPayload);
+          } else if(res.j.contentType==="addon_offer"&&res.j.structuredPayload){
+            if(res.j.content) appendMsg("assistant",res.j.content);
+            appendAddonCard(res.j.structuredPayload);
+          } else if(res.j.contentType==="reschedule_offer"&&res.j.structuredPayload){
+            if(res.j.content) appendMsg("assistant",res.j.content);
+            appendRescheduleCard(res.j.structuredPayload);
+          } else {
+            appendMsg("assistant",res.j.content||"");
+          }
+          if(res.j.pendingOwnerApproval){
+            appendMsg("assistant",s("approval_pending"));
+          }
+          if(res.j.suggestedFollowups) renderPrompts(res.j.suggestedFollowups);
+        }
+      })
+      .catch(function(){
+        if(typing&&typing.parentNode) typing.parentNode.removeChild(typing);
+        appendMsg("assistant",s("send_err"));
+      })
+      .finally(function(){ setSending(false); input.focus(); });
+  }
+
+  /* ─── Proactive nudge ──────────────────────────────────────── */
+  function dismissNudge(){
+    if(nudgeEl) nudgeEl.classList.remove("qpc-show");
+  }
+  function showNudge(text){
+    if(nudgeShown||widgetOpened) return;
+    nudgeText.textContent=text;
+    nudgeEl.classList.add("qpc-show");
+    nudgeShown=true;
+  }
+  function scheduleNudge(){
+    if(nudgeShown||widgetOpened) return;
+    if(nudgeTimer) clearTimeout(nudgeTimer);
+    nudgeTimer=setTimeout(function(){
+      if(widgetOpened) return;
+      fetchAndShowNudge("idle_90s");
+    }, 90 * 1000);
+  }
+  function fetchAndShowNudge(trigger){
+    fetch(API+"/nudge?trigger="+encodeURIComponent(trigger),{credentials:"same-origin"})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j&&j.shouldShow&&j.text){
+          if(j.language&&j.language!==lang){ lang=j.language; applyLanguage(); }
+          showNudge(j.text);
+        }
+      })
+      .catch(function(){});
+  }
+  /* T207: scroll-past-pricing trigger — counts how many times the customer
+     scrolls past the pricing/options section. After 2 passes we fire a nudge
+     immediately (independent of the 90s idle timer). */
+  function armPricingScrollTrigger(){
+    var target=document.querySelector("[data-pricing]")||document.getElementById("options-section")||document.querySelector(".options-section");
+    if(!target||typeof IntersectionObserver==="undefined") return;
+    var passes=0;
+    var wasVisible=false;
+    var fired=false;
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          wasVisible=true;
+        } else if(wasVisible){
+          // user scrolled past it after seeing it
+          passes++;
+          wasVisible=false;
+          if(passes>=2 && !fired && !widgetOpened && !nudgeShown){
+            fired=true;
+            fetchAndShowNudge("scroll_past_price");
+          }
+        }
+      });
+    }, { threshold: 0.25 });
+    io.observe(target);
+  }
+  nudgeX.addEventListener("click",function(e){ e.stopPropagation(); dismissNudge(); });
+  nudgeEl.addEventListener("click",function(){
+    // Track engagement, then open the widget
+    if(lastConversationId){
+      fetch(API+"/nudge-engaged",{
+        method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({conversationId:lastConversationId})
+      }).catch(function(){});
+    }
+    dismissNudge();
+    openPanel();
+  });
+
+  function openPanel(){
+    widgetOpened=true;
+    panel.classList.add("qpc-open");
+    launch.style.display="none";
+    dismissNudge();
+    if(nudgeTimer) clearTimeout(nudgeTimer);
+    if(!initialized) init();
+    setTimeout(function(){ try{ input.focus(); }catch(e){} },120);
+  }
+
+  launch.addEventListener("click",openPanel);
+  closeBtn.addEventListener("click",function(){
+    panel.classList.remove("qpc-open");
+    launch.style.display="flex";
+  });
+  input.addEventListener("input",autosize);
+  input.addEventListener("keydown",function(e){
+    if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendMessage(input.value,"text"); }
+  });
+  send.addEventListener("click",function(){ sendMessage(input.value,"text"); });
+
+  // Detect browser language for initial UI strings (overridden once user types)
+  try{
+    var nl=(navigator.language||"en").toLowerCase();
+    var supported=["en","es","pt","fr","zh","vi","tl","ko"];
+    for(var i=0;i<supported.length;i++){
+      if(nl.indexOf(supported[i])===0){ lang=supported[i]; break; }
+    }
+    // Map common variants
+    if(nl.indexOf("zh")===0) lang="zh";
+    if(nl.indexOf("fil")===0||nl.indexOf("tl")===0) lang="tl";
+  }catch(e){}
+  applyLanguage();
+
+  // Auto-init on load so we can fire idle nudge without requiring panel open
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",init);
+  } else {
+    init();
+  }
+})();
 </script>
 </body>
 </html>

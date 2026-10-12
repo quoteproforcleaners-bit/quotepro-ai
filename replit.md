@@ -24,6 +24,7 @@ The system uses session-based authentication supporting email/password, Apple, a
 ### Core Functionality
 - **First-Quote Onboarding Gate**: New users cannot access the dashboard or any nav until they generate their first quote. Gate routes to `/onboarding/first-quote`, then `/onboarding/complete` which shows an iframe preview of the live customer quote view (`?preview=1` param disables analytics/tracking). Gate skips for existing users via `has_completed_first_quote` DB flag (backfilled). `OnboardingCompletePage` calls `auth.refresh()` before navigating to `/dashboard` so the gate is correctly lifted client-side. E2E Playwright tests live in `tests/first-quote-gate.spec.ts`.
 - **Quote Calculation Engine**: A flexible engine that calculates base hours and applies multipliers, supporting customizable service types, discounts, add-ons, and AI-powered commercial quoting.
+- **Quote Pricing Display (single source of truth)**: `web/src/lib/quotePricing.ts` exports `calculateQuotePrice()` returning a canonical `QuotePricingResult` consumed by every UI surface on the `/quotes/new` Review step (header total, breakdown, ALL OPTIONS list, benchmark widget). Invariant: `sum(breakdown[].amount) === finalPrice`, asserted in dev. Snapshot tests for 5 scenarios in `web/src/lib/quotePricing.test.ts` (vitest). `ResidentialLivePreview` accepts a single `pricing` prop — no parallel calculation paths.
 - **Instant Quote Page**: Public-facing pages allowing customers to view, accept quotes, select tiers, toggle add-ons, make deposit payments, and view testimonials. Supports `?preview=1` parameter for operator previews (disables view logging, push notifications, follow-up creation, and accept/decline actions).
 - **AI Features**: Includes an AI Agent with "My Business", "Coach Me", and "Teach Me" modes; Walkthrough AI Quoting for structured details from natural language; AI Closing Assistant for customer messages; and AI Dynamic Pricing Suggestions.
 - **Job Management**: Provides detailed job scheduling, status tracking, and customer-facing updates.
@@ -31,7 +32,7 @@ The system uses session-based authentication supporting email/password, Apple, a
 - **Public SEO Calculator Pages**: Commercial and residential cleaning cost calculators with benchmarks, PDF exports, and shareable URLs. These are driven by a scalable calculator engine that generates pages from `CalcDefinition` objects.
 - **Lead Link Microsite**: A progressive disclosure quote request page for customers.
 - **Smart Push Notification System**: Server-side push notifications for various triggers with user preferences and cron-based scheduling.
-- **Trial Drip Email System**: A sequence of emails to new users to encourage platform engagement.
+- **Trial Drip Email System**: A sequence of emails to new users to encourage platform engagement. Plus four lifecycle nudges to business-owner users: paid-but-inactive churn winback (uses `users.churn_risk_score >= 50` with 30-day cooldown), paywall-cancel rescue (targets owners whose business fired `cancel_paywall` in last 7 days, deduped via `communications.template_key='paywall_cancel_rescue'`), AI Concierge launch announcement (one-time blast to all paid tiers, deduped via `template_key='concierge_launch_v1'`), and AI Concierge "hot lead" alerts (notifies owner when a customer chatted with the concierge ≥2 times in last 24h without booking, deduped per conversation via `template_key='concierge_hot_lead'`). All four are exposed via admin trigger endpoints `POST /api/admin/trigger-{churn-winback,paywall-rescue,concierge-launch,concierge-hot-leads}` (auth: `x-admin-key` header against `ADMIN_API_KEY` or `ADMIN_GRANT_PRO_SECRET`; rate-limit: 5/hr per endpoint per IP via `makeTriggerLimiter()`; safe-mode: `?dryRun=1` to count targets without sending; concurrency: distributed locks via `lockManager`).
 - **Multilingual System**: Supports per-business currency, app language, and outbound communication language with customer-specific overrides.
 - **Customer Portal**: A "My Home" portal for customers to manage quotes, reschedule requests, and view preferences.
 - **Model Context Protocol (MCP) Server**: Exposes API tools for AI agents (e.g., `get_cleaning_quote`, `get_commercial_bid`) via an OpenPlugin manifest.
@@ -59,6 +60,7 @@ The system uses session-based authentication supporting email/password, Apple, a
 
 ### AI Integration
 - OpenAI (gpt-4o-mini via Replit AI Integrations)
+- Anthropic Claude (claude-sonnet-4-5 via callAI) — powers the customer-facing AI Concierge widget on the public quote page (/q/:token). Endpoints live in server/routers/aiConciergeRouter.ts (`/api/q/:token/ai/init`, `/api/q/:token/ai/message`); business logic in server/services/aiConcierge.ts. Persistence: quote_ai_conversations + quote_ai_messages with unique (quote_id, customer_session_id) index. Owner toggles: quotes.ai_widget_enabled, users.ai_widget_settings.
 
 ### Third-Party Services
 - **Twilio**: SMS integration.

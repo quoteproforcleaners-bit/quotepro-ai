@@ -10,7 +10,8 @@ import type {
 import type { FacilityType } from"shared/pricingEngine";
 import { compareToBenchmark, benchmarkBadgeText, BENCHMARK_CITATIONS, NATIONAL_AVERAGES } from"../lib/benchmarks";
 import { Tooltip, LabelWithTooltip } from"./Tooltip";
-import { CommercialBenchmarkBadge, ResidentialBenchmarkBadge } from"./BenchmarkBadge";
+import { CommercialBenchmarkBadge, ResidentialBenchmarkBadge, type ResidentialServiceCategory } from"./BenchmarkBadge";
+import type { QuotePricingResult, ManualAdjustment as PricingManualAdjustment } from "../lib/quotePricing";
 
 // ─── Animated Number ──────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ const IndustryBenchmarkBadge = CommercialBenchmarkBadge;
 
 // ─── Manual Adjustment ────────────────────────────────────────────────────────
 
-export interface ManualAdjustment { amount: number; note: string; }
+export type ManualAdjustment = PricingManualAdjustment;
 
 function ManualAdjustmentPanel({ adjustment, onChange }: { adjustment: ManualAdjustment; onChange: (a: ManualAdjustment) => void }) {
  const [open, setOpen] = useState(adjustment.amount !== 0);
@@ -225,72 +226,72 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
 
 // ─── Residential Preview ──────────────────────────────────────────────────────
 
+/**
+ * ResidentialLivePreview — renders entirely from a single QuotePricingResult.
+ *
+ * Single source of truth: every displayed value (header label, total, breakdown,
+ * ALL OPTIONS list, benchmark widget service name) reads from the `pricing`
+ * prop. No parallel calculation paths. The math is asserted in dev.
+ */
 interface ResidentialPreviewProps {
- result: ResidentialQuoteResult;
- selectedTier:"good"|"better"|"best";
- priceOverride?: number;
- adjustment: ManualAdjustment;
- onAdjustmentChange: (a: ManualAdjustment) => void;
+ pricing: QuotePricingResult;
+ onAdjustmentChange: (a: PricingManualAdjustment) => void;
  frequency: string;
  beds?: number;
 }
 
-export function ResidentialLivePreview({ result, selectedTier, priceOverride, adjustment, onAdjustmentChange, frequency, beds }: ResidentialPreviewProps) {
- const tier = result[selectedTier];
- const basePrice = priceOverride ?? tier.price;
- const total = basePrice + adjustment.amount;
- const isRecurring = frequency !=="one-time";
+export function ResidentialLivePreview({ pricing, onAdjustmentChange, frequency, beds }: ResidentialPreviewProps) {
+ const isFlat = pricing.kind === "flat";
+ const isRecurring = frequency !== "one-time";
  const [rulesOpen, setRulesOpen] = useState(true);
+ const firstCleanPrice = pricing.firstCleanPrices[pricing.selectedTier];
 
  return (
  <div className="space-y-4">
  <div className="text-center py-5 px-4 bg-gradient-to-b from-slate-50 to-white rounded-2xl border border-slate-200/80">
  <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">
- {selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} · {tier.name}
+ {pricing.headerLabel}
  </p>
- <AnimatedPrice value={total} className="text-4xl font-black tracking-tight text-slate-900"/>
- {isRecurring && tier.firstCleanPrice ? (
+ <AnimatedPrice value={pricing.finalPrice} className="text-4xl font-black tracking-tight text-slate-900"/>
+ {pricing.isAdjusted && (
+   <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">Adjusted</span>
+ )}
+ {!isFlat && isRecurring && firstCleanPrice ? (
  <div className="mt-2 space-y-0.5">
  <p className="text-xs text-slate-400">per visit (recurring)</p>
- <p className="text-xs font-medium text-amber-600">First visit: ${tier.firstCleanPrice.toFixed(0)}</p>
+ <p className="text-xs font-medium text-amber-600">First visit: ${firstCleanPrice.toFixed(0)}</p>
  </div>
  ) : (
- <p className="mt-1 text-xs text-slate-400">{isRecurring ?"per visit":"one-time"}</p>
+ <p className="mt-1 text-xs text-slate-400">{isFlat ? "one-time flat rate" : (isRecurring ? "per visit" : "one-time")}</p>
  )}
+ {!isFlat && pricing.laborHours != null && pricing.laborHours > 0 && (
  <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 bg-slate-100 rounded-full">
  <Clock className="w-3 h-3 text-slate-400"/>
- <span className="text-xs text-slate-500 font-medium">~{tier.totalHours}h labor estimate</span>
+ <span className="text-xs text-slate-500 font-medium">~{pricing.laborHours}h labor estimate</span>
  <Tooltip text="Total labor hours estimated for this job using ISSA residential cleaning benchmarks (approx. 30–45 min/room depending on size and condition)."source={BENCHMARK_CITATIONS.ISSA_2025} />
  </div>
+ )}
  </div>
 
- {result[selectedTier].warnings.length > 0 && (
+ {!isFlat && pricing.warnings.length > 0 && (
  <div className="space-y-2">
- {result[selectedTier].warnings.map((w, i) => <WarningChip key={i} w={w} />)}
+ {pricing.warnings.map((w: Warning, i: number) => <WarningChip key={i} w={w} />)}
  </div>
  )}
 
- {beds && beds > 0 && total > 0 && (
- <ResidentialBenchmarkBadge visitPrice={total} beds={beds} frequency={frequency} />
+ {beds && beds > 0 && pricing.finalPrice > 0 && (
+ <ResidentialBenchmarkBadge visitPrice={pricing.finalPrice} beds={beds} sqft={pricing.propertySqft} frequency={frequency} cleaningType={pricing.benchmarkCategory} />
  )}
 
  <Section title="Price Breakdown"defaultOpen>
- {tier.lineItems.map((item, i) => <LineItemRow key={i} item={item} />)}
- {adjustment.amount !== 0 && (
- <div className="flex items-center justify-between py-1.5 border-t border-dashed border-slate-200 mt-1">
- <span className="text-xs text-slate-500 leading-tight italic">{adjustment.note ||"Manual adjustment"}</span>
- <span className={`text-xs font-bold tabular-nums ${adjustment.amount > 0 ?"text-amber-600":"text-emerald-600"}`}>
- {adjustment.amount > 0 ?"+":"−"}${Math.abs(adjustment.amount).toLocaleString()}
- </span>
- </div>
- )}
+ {pricing.breakdown.map((item, i) => <LineItemRow key={i} item={item} />)}
  <div className="flex items-center justify-between pt-2 border-t border-slate-200 mt-1">
  <span className="text-xs font-bold text-slate-700">Total</span>
- <span className="text-sm font-black text-slate-900 tabular-nums">${total.toLocaleString()}</span>
+ <span className="text-sm font-black text-slate-900 tabular-nums">${pricing.finalPrice.toLocaleString()}</span>
  </div>
  </Section>
 
- {tier.appliedRules.length > 0 && (
+ {!isFlat && pricing.appliedRules.length > 0 && (
  <div className="border-t border-slate-100 pt-3">
  <button onClick={() => setRulesOpen(!rulesOpen)}
  className="w-full flex items-center justify-between text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
@@ -299,7 +300,7 @@ export function ResidentialLivePreview({ result, selectedTier, priceOverride, ad
  </button>
  {rulesOpen && (
  <div className="space-y-1.5">
- {tier.appliedRules.map((rule, i) => (
+ {pricing.appliedRules.map((rule, i) => (
  <div key={i} className="flex items-center gap-2 text-xs">
  <CheckCircle2 className="w-3 h-3 text-primary-500 shrink-0"/>
  <span className="text-slate-600">{rule.label}</span>
@@ -315,19 +316,24 @@ export function ResidentialLivePreview({ result, selectedTier, priceOverride, ad
  </div>
  )}
 
+ {!isFlat && (
  <Section title="All Options"defaultOpen={false}>
  {(["good","better","best"] as const).map((t) => {
- const d = result[t]; const isActive = t === selectedTier;
+ const isActive = t === pricing.selectedTier;
+ const optPrice = pricing.tierPrices[t];
+ const optLabel = pricing.tierLabels[t];
  return (
  <div key={t} className={`flex items-center justify-between py-1.5 px-2 rounded-lg ${isActive ?"bg-primary-50":""}`}>
- <span className={`text-xs capitalize ${isActive ?"font-bold text-primary-700":"text-slate-500"}`}>{t} · {d.name}</span>
- <span className={`text-xs font-bold tabular-nums ${isActive ?"text-primary-700":"text-slate-600"}`}>${d.price.toLocaleString()}</span>
+ <span className={`text-xs capitalize ${isActive ?"font-bold text-primary-700":"text-slate-500"}`}>{t} · {optLabel}</span>
+ <span className={`text-xs font-bold tabular-nums ${isActive ?"text-primary-700":"text-slate-600"}`}>${optPrice.toLocaleString()}{isActive && pricing.isAdjusted ?" *":""}</span>
  </div>
  );
  })}
+ {pricing.isAdjusted && <p className="text-[10px] text-slate-400 mt-1">* includes pricing override / manual adjustment</p>}
  </Section>
+ )}
 
- <ManualAdjustmentPanel adjustment={adjustment} onChange={onAdjustmentChange} />
+ <ManualAdjustmentPanel adjustment={pricing.manualAdjustment} onChange={onAdjustmentChange} />
  </div>
  );
 }

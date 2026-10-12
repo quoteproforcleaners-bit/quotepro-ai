@@ -199,7 +199,7 @@ function PrimaryCTA({ onPress }: { onPress: () => void }) {
         >
           <View style={styles.primaryButtonGlow} />
           <Feather name="file-text" size={18} color="#FFFFFF" />
-          <ThemedText style={styles.primaryButtonText}>Create Free Quote</ThemedText>
+          <ThemedText style={styles.primaryButtonText}>Create a Quote</ThemedText>
           <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.7)" style={{ marginLeft: 4 }} />
         </Pressable>
       </Animated.View>

@@ -1,9 +1,12 @@
 /**
  * server/onboardingNudge.ts
  *
- * Daily 9am UTC cron: find non-free users who signed up > 72h ago and have
- * never sent a quote. Send one nudge email and set onboarding_nudge_sent = true
- * so we never email them again.
+ * Daily 9am UTC cron, two passes (both gated by onboarding_nudge_sent dedupe):
+ *   1. Free-tier signups > 24h old, zero quotes — short personal-feeling email
+ *      from Mike asking what's blocking them. Catches the silent-bounce
+ *      signups (e.g. nate@bridgenow.ai) who would otherwise get nothing.
+ *   2. Paid (Starter+/trial) signups > 72h old, zero quotes — longer
+ *      walkthrough email so a paid user doesn't waste their trial sitting idle.
  */
 
 import { pool } from "./db";
@@ -76,7 +79,118 @@ function buildNudgeHtml(firstName: string, ctaUrl: string): string {
 </html>`;
 }
 
+function buildFreeNudgeHtml(firstName: string, ctaUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table width="560" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+          <tr>
+            <td style="padding:8px 8px 24px;">
+              <p style="margin:0 0 18px;font-size:16px;color:#111827;line-height:1.6;">
+                Hey ${firstName},
+              </p>
+              <p style="margin:0 0 18px;font-size:16px;color:#111827;line-height:1.6;">
+                I noticed you signed up for QuotePro AI yesterday but haven't built a quote yet. I'm just trying to figure out if something tripped you up &mdash; sign-up confusion, pricing questions, or just life got busy?
+              </p>
+              <p style="margin:0 0 18px;font-size:16px;color:#111827;line-height:1.6;">
+                If it helps: building your first quote takes about 2 minutes &mdash; you punch in the home details and the AI prices it for you. Free plan gets you 3 quotes to try it out, no card required.
+              </p>
+              <p style="margin:0 0 24px;font-size:16px;color:#111827;line-height:1.6;">
+                <a href="${ctaUrl}" style="color:#4f46e5;text-decoration:underline;font-weight:600;">Build a quick test quote here</a> &mdash; or just hit reply and tell me what's blocking you. I read every email personally.
+              </p>
+              <p style="margin:0;font-size:16px;color:#111827;line-height:1.6;">
+                &mdash; Mike<br/>
+                <span style="font-size:14px;color:#6b7280;">Founder, QuotePro AI</span>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Free-tier nudge: catches signups who created an account, never sent a quote,
+ * and are still on the free plan after 24+ hours. Plain-text-feeling personal
+ * email from the founder.
+ */
+export async function processFreeSignupNudges(): Promise<void> {
+  const ctaUrl = `${BASE_APP_URL}/quotes/new`;
+
+  // Idempotent column add — separate dedupe so a free user who later upgrades
+  // can still receive the paid 72h walkthrough (which uses onboarding_nudge_sent).
+  await pool.query(`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS free_signup_nudge_sent BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
+  const result = await pool.query<{
+    id: number;
+    email: string;
+    contact_email: string | null;
+    name: string | null;
+  }>(`
+    SELECT id, email, contact_email, name
+    FROM users
+    WHERE first_quote_sent_at IS NULL
+      AND free_signup_nudge_sent = false
+      AND subscription_tier = 'free'
+      AND created_at < NOW() - INTERVAL '24 hours'
+      AND created_at > NOW() - INTERVAL '14 days'
+      AND (email_unreachable IS NULL OR email_unreachable = false)
+      AND (trial_drip_unsubscribed IS NULL OR trial_drip_unsubscribed = false)
+  `);
+
+  if (result.rows.length === 0) return;
+
+  console.log(`[onboarding-nudge] ${result.rows.length} free-tier user(s) eligible for 24h nudge`);
+  let sent = 0;
+
+  for (const user of result.rows) {
+    const firstName = getFirstName(user.name, user.email);
+    const toEmail = user.contact_email || user.email;
+
+    try {
+      await sendEmail({
+        to: toEmail,
+        subject: "Anything I can help with?",
+        html: buildFreeNudgeHtml(firstName, ctaUrl),
+        text: `Hey ${firstName},\n\nI noticed you signed up for QuotePro AI yesterday but haven't built a quote yet. I'm just trying to figure out if something tripped you up — sign-up confusion, pricing questions, or just life got busy?\n\nIf it helps: building your first quote takes about 2 minutes. Free plan gets you 3 quotes to try it out, no card required.\n\nBuild a quick test quote here: ${ctaUrl}\n\nOr just hit reply and tell me what's blocking you. I read every email personally.\n\n— Mike\nFounder, QuotePro AI`,
+        fromName: "Mike at QuotePro",
+        replyTo: PLATFORM_FROM_EMAIL,
+      });
+
+      await pool.query(
+        "UPDATE users SET free_signup_nudge_sent = true WHERE id = $1",
+        [user.id]
+      );
+
+      trackEvent(user.id, AnalyticsEvents.ONBOARDING_STALLED_72H, { variant: "free_24h" }).catch(() => {});
+      sent++;
+    } catch (err: any) {
+      console.error(`[onboarding-nudge] Free-tier failed for user ${user.id}:`, err.message);
+    }
+  }
+
+  console.log(`[onboarding-nudge] Sent ${sent} free-tier nudge email(s)`);
+}
+
 export async function processOnboardingNudges(): Promise<void> {
+  // Pass 1: free-tier signups (24h, personal tone)
+  try {
+    await processFreeSignupNudges();
+  } catch (err: any) {
+    console.error("[onboarding-nudge] Free-tier pass failed:", err.message);
+  }
+
+  // Pass 2: paid/trial signups (72h, walkthrough tone)
   const ctaUrl = `${BASE_APP_URL}/quotes/new`;
 
   const result = await pool.query<{
@@ -98,7 +212,7 @@ export async function processOnboardingNudges(): Promise<void> {
 
   if (result.rows.length === 0) return;
 
-  console.log(`[onboarding-nudge] ${result.rows.length} user(s) eligible for nudge`);
+  console.log(`[onboarding-nudge] ${result.rows.length} paid user(s) eligible for 72h nudge`);
   let sent = 0;
 
   for (const user of result.rows) {
@@ -127,5 +241,5 @@ export async function processOnboardingNudges(): Promise<void> {
     }
   }
 
-  console.log(`[onboarding-nudge] Sent ${sent} nudge email(s)`);
+  console.log(`[onboarding-nudge] Sent ${sent} paid nudge email(s)`);
 }

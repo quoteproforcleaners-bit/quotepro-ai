@@ -82,15 +82,6 @@ export default function MoreMenuScreen() {
       screen: "GrowthDashboard",
     },
     {
-      key: "leadRadar",
-      label: "Lead Radar",
-      subtitle: "Find leads in your area",
-      icon: "radio",
-      iconColor: theme.primary,
-      iconBg: `${theme.primary}18`,
-      screen: "LeadFinder",
-    },
-    {
       key: "settings",
       label: "Settings",
       subtitle: "Account, billing, preferences",

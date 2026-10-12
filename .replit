@@ -1,12 +1,12 @@
 entrypoint = "README.md"
-modules = ["nodejs-22", "postgresql-16"]
+modules = ["nodejs-22", "python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "server:build"]
+build = ["bash", "-c", "cd web && npx vite build --logLevel warn && cd .. && npm run server:build"]
 run = ["bash", "-c", "NODE_ENV=production node server_dist/index.js"]
 publicDir = "dist"
 

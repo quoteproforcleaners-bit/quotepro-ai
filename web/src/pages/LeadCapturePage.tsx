@@ -34,9 +34,17 @@ export default function LeadCapturePage() {
  const queryClient = useQueryClient();
  const navigate = useNavigate();
 
- const { data: settings, isLoading } = useQuery<LeadCaptureSettings>({
+ const { data: settings, isLoading, error: settingsError } = useQuery<LeadCaptureSettings>({
  queryKey: ["/api/business/lead-capture-settings"],
  });
+ // Surface a clear error if the URL/QR data fails to load. Previously the
+ // page rendered "—" and an empty QR canvas with no explanation, which
+ // looked like a P0 outage when it was actually a 4xx from the API.
+ useEffect(() => {
+   if (settingsError) {
+     console.error("[lead-capture] settings fetch failed:", settingsError);
+   }
+ }, [settingsError]);
 
  const { data: analytics } = useQuery<LeadLinkAnalytics>({
  queryKey: ["/api/business/lead-link-analytics"],
@@ -378,7 +386,7 @@ export default function LeadCapturePage() {
  </div>
  {!pricingStatus.configured && (
  <button
- onClick={() => navigate("/pricing")}
+ onClick={() => navigate("/settings?tab=business#pricing")}
  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors shrink-0"
  >
  <Settings className="w-3.5 h-3.5"/>
@@ -422,6 +430,18 @@ export default function LeadCapturePage() {
  <Link2 className="w-4 h-4 text-blue-600"/>
  Your Instant Quote Link
  </h3>
+
+ {settingsError ? (
+ <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2.5">
+ <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5"/>
+ <div className="flex-1 text-sm">
+ <p className="font-semibold text-red-900">Unable to load your link</p>
+ <p className="text-red-700 mt-0.5">
+ {(settingsError as Error)?.message || "Please refresh the page. If the problem persists, contact support."}
+ </p>
+ </div>
+ </div>
+ ) : null}
 
  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
  <span className="text-sm text-blue-600 font-medium truncate flex-1">{settings?.publicUrl ||"—"}</span>

@@ -29,6 +29,7 @@ import { PageHeader, Card, CardHeader, Button, Badge, Alert } from "../component
 import { computeResidentialQuote } from "shared/pricingEngine";
 import { ResidentialLivePreview, LivePreviewPanel } from "../components/LiveQuotePreview";
 import type { ManualAdjustment } from "../components/LiveQuotePreview";
+import { calculateQuotePrice, type QuoteServiceType as PricingServiceType } from "../lib/quotePricing";
 
 const steps = ["Customer", "Property", "Services", "Review"];
 
@@ -311,6 +312,99 @@ export default function QuoteCreatePage() {
     queryKey: ["/api/customers"],
   });
   const { data: pricing } = useQuery<any>({ queryKey: ["/api/pricing"] });
+
+  // Service Types (Option B) — fetch business catalog so quote builder shows
+  // a "what kind of clean is this" picker. Active types only.
+  const { data: serviceTypesData } = useQuery<{
+    serviceTypes: Array<{
+      id: string;
+      typeKey: string;
+      displayName: string;
+      pricingModel: "tiered" | "flat";
+      pricingConfig?: {
+        basePrice?: number;
+        perSqft?: number;
+        perBedroom?: number;
+        perBathroom?: number;
+        minimum?: number;
+        multipliers?: { good: number; better: number; best: number };
+      } | null;
+      isActive: boolean;
+      sortOrder: number;
+    }>;
+  }>({
+    queryKey: ["/api/service-types"],
+  });
+  const activeServiceTypes = (serviceTypesData?.serviceTypes || []).filter((t) => t.isActive);
+
+  // Locations — pick which location this quote is for. Hidden when the
+  // account only has one (or zero) locations so single-location operators
+  // see no extra UI.
+  const { data: locationsList = [] } = useQuery<Array<{ id: string; name: string; address: string | null; active: boolean; is_primary: boolean }>>({
+    queryKey: ["/api/locations"],
+  });
+  const visibleLocations = locationsList.filter((l) => l.active);
+  const { data: meData } = useQuery<{ user?: { activeLocationId?: string | null } }>({ queryKey: ["/api/auth/me"] });
+  const activeLocationIdFromMe = meData?.user?.activeLocationId || null;
+  const [locationId, setLocationId] = useState<string | null>(null);
+  useEffect(() => {
+    if (locationId) return;
+    if (visibleLocations.length === 0) return;
+    const preferred =
+      visibleLocations.find((l) => l.id === activeLocationIdFromMe) ||
+      visibleLocations.find((l) => l.is_primary) ||
+      visibleLocations[0];
+    if (preferred) setLocationId(preferred.id);
+  }, [visibleLocations, activeLocationIdFromMe, locationId]);
+
+  const [serviceTypeId, setServiceTypeId] = useState<string | null>(null);
+  // Default to residential_recurring once data loads
+  useEffect(() => {
+    if (!serviceTypeId && activeServiceTypes.length > 0) {
+      const residential = activeServiceTypes.find((t) => t.typeKey === "residential_recurring");
+      setServiceTypeId((residential || activeServiceTypes[0]).id);
+    }
+  }, [activeServiceTypes, serviceTypeId]);
+  const selectedServiceType = activeServiceTypes.find((t) => t.id === serviceTypeId) || null;
+  const isFlatService = selectedServiceType?.pricingModel === "flat";
+
+  // Map service-type typeKey -> benchmark category for the right-side
+  // benchmark badge. Tiered standard cleans fall back to "standard".
+  const cleaningCategory: "standard" | "recurring" | "deep" | "moveinout" | "postconstruct" | "airbnb" | undefined = (() => {
+    switch (selectedServiceType?.typeKey) {
+      case "deep_clean": return "deep";
+      case "move_in_out": return "moveinout";
+      case "post_construction": return "postconstruct";
+      case "airbnb": return "airbnb";
+      case "residential_recurring": return "standard";
+      default: return undefined;
+    }
+  })();
+
+  // Flat-price state — inline edit override on the Review step.
+  const [flatPriceOverride, setFlatPriceOverride] = useState<number | null>(null);
+  const [editingFlatPrice, setEditingFlatPrice] = useState(false);
+  const [editingFlatValue, setEditingFlatValue] = useState("");
+
+  // Computed flat price from the service type's pricingConfig +
+  // property-driven add-ons (perSqft, perBedroom, perBathroom). The
+  // `minimum` floor ensures small jobs still cover overhead.
+  const flatComputed = useMemo(() => {
+    const cfg = selectedServiceType?.pricingConfig || {};
+    const base = Number(cfg.basePrice) || 0;
+    const perSqft = Number(cfg.perSqft) || 0;
+    const perBed = Number(cfg.perBedroom) || 0;
+    const perBath = Number(cfg.perBathroom) || 0;
+    const min = Number(cfg.minimum) || 0;
+    const calc =
+      base +
+      perSqft * (property.sqft || 0) +
+      perBed * (property.beds || 0) +
+      perBath * ((property.baths || 0) + 0.5 * (property.halfBaths || 0));
+    return Math.max(min, Math.round(calc));
+  }, [selectedServiceType, property.sqft, property.beds, property.baths, property.halfBaths]);
+
+  const flatPriceBase = flatPriceOverride ?? flatComputed;
   const { data: quotaData } = useQuery<{ count: number; limit: number | null; isPro: boolean; isInFreeTrial: boolean }>({
     queryKey: ["/api/quotes/count"],
     staleTime: 10_000,
@@ -358,6 +452,36 @@ export default function QuoteCreatePage() {
     () => computeResidentialQuote(property, services.addOns, services.frequency, pricing ?? null),
     [property, services.addOns, services.frequency, pricing]
   );
+
+  // ─── Canonical pricing object ──────────────────────────────────────────────
+  // Single source of truth for the Review step display. Header total, breakdown,
+  // tier cards, ALL OPTIONS list, and benchmark widget all read from this.
+  // Defined in web/src/lib/quotePricing.ts with snapshot tests for 5 scenarios.
+  const pricingServiceType: PricingServiceType = useMemo(() => ({
+    id: selectedServiceType?.id || "default",
+    typeKey: selectedServiceType?.typeKey || "residential_recurring",
+    displayName: selectedServiceType?.displayName || "Residential Cleaning",
+    pricingMode: (isFlatService ? "flat" : "tiered") as "flat" | "tiered",
+    benchmarkCategory: cleaningCategory as PricingServiceType["benchmarkCategory"],
+    pricingConfig: selectedServiceType?.pricingConfig as PricingServiceType["pricingConfig"],
+  }), [selectedServiceType, isFlatService, cleaningCategory]);
+
+  const quotePricing = useMemo(() => calculateQuotePrice({
+    serviceType: pricingServiceType,
+    property: {
+      sqft: property.sqft || 0,
+      beds: property.beds || 0,
+      baths: property.baths || 0,
+      halfBaths: property.halfBaths || 0,
+    },
+    selectedTier: isFlatService ? "better" : selectedOption,
+    engineResult: isFlatService ? null : quote,
+    aiPriceOverrides: aiPriceOverrides,
+    firstCleanOverrides: firstCleanOverrides,
+    flatPriceOverride: isFlatService ? flatPriceOverride : null,
+    manualAdjustment: adjustment,
+    frequency: services.frequency,
+  }), [pricingServiceType, property.sqft, property.beds, property.baths, property.halfBaths, isFlatService, selectedOption, quote, aiPriceOverrides, firstCleanOverrides, flatPriceOverride, adjustment, services.frequency]);
 
   const commitPriceEdit = (tier: "good" | "better" | "best") => {
     const parsed = parseFloat(editingValue.replace(/[^0-9.]/g, ""));
@@ -468,12 +592,24 @@ export default function QuoteCreatePage() {
       ? `${customerForm.firstName} ${customerForm.lastName}`.trim()
       : undefined;
 
-    const selected = quote[selectedOption];
-    const goodPrice = (aiPriceOverrides?.good ?? quote.good.price) + (adjustment.amount || 0);
-    const betterPrice = (aiPriceOverrides?.better ?? quote.better.price) + (adjustment.amount || 0);
-    const bestPrice = (aiPriceOverrides?.best ?? quote.best.price) + (adjustment.amount || 0);
+    // Flat-price services collapse all three tiers to the same flat price
+    // and force `better` as the "selected" tier so the customer-facing quote
+    // shows a single price card. The server's quote schema requires all
+    // three options to be present, so we mirror the flat price across them.
+    const flatTotal = flatPriceBase + (adjustment.amount || 0);
+    const goodPrice = isFlatService
+      ? flatTotal
+      : (aiPriceOverrides?.good ?? quote.good.price) + (adjustment.amount || 0);
+    const betterPrice = isFlatService
+      ? flatTotal
+      : (aiPriceOverrides?.better ?? quote.better.price) + (adjustment.amount || 0);
+    const bestPrice = isFlatService
+      ? flatTotal
+      : (aiPriceOverrides?.best ?? quote.best.price) + (adjustment.amount || 0);
+    const effectiveSelectedOption: "good" | "better" | "best" = isFlatService ? "better" : selectedOption;
+    const effectiveRecommendedOption: "good" | "better" | "best" = isFlatService ? "better" : recommendedOption;
     const finalPrices = { good: goodPrice, better: betterPrice, best: bestPrice };
-    const finalPrice = finalPrices[selectedOption];
+    const finalPrice = finalPrices[effectiveSelectedOption];
 
     const quoteData = {
       customerId: cid || undefined,
@@ -486,35 +622,57 @@ export default function QuoteCreatePage() {
       propertyBaths: (property.baths || 0) + (property.halfBaths || 0) * 0.5,
       propertySqft: property.sqft || 0,
       frequencySelected: services.frequency,
-      recommendedOption,
-      selectedOption,
+      recommendedOption: effectiveRecommendedOption,
+      selectedOption: effectiveSelectedOption,
       options: {
         good: {
           price: goodPrice,
-          firstCleanPrice: firstCleanOverrides.good != null ? firstCleanOverrides.good + (adjustment.amount || 0) : (quote.good.firstCleanPrice != null ? quote.good.firstCleanPrice + (adjustment.amount || 0) : undefined),
-          name: "Good",
-          serviceTypeName: quote.good.name || "Touch Up",
-          serviceTypeId: quote.good.serviceTypeId || "touch-up",
-          scope: aiScopes?.good || quote.good.scope || "",
-          addOnsIncluded: [],
+          firstCleanPrice: isFlatService
+            ? undefined
+            : (firstCleanOverrides.good != null ? firstCleanOverrides.good + (adjustment.amount || 0) : (quote.good.firstCleanPrice != null ? quote.good.firstCleanPrice + (adjustment.amount || 0) : undefined)),
+          name: isFlatService ? (selectedServiceType?.displayName || "Flat-Price Service") : "Good",
+          serviceTypeName: isFlatService
+            ? (selectedServiceType?.displayName || "Flat-Price Service")
+            : (quote.good.name || "Touch Up"),
+          serviceTypeId: isFlatService
+            ? (selectedServiceType?.typeKey || "flat")
+            : (quote.good.serviceTypeId || "touch-up"),
+          scope: isFlatService ? "" : (aiScopes?.good || quote.good.scope || ""),
+          addOnsIncluded: isFlatService
+            ? addOnOptions.filter(o => services.addOns[o.key]).map(o => o.label)
+            : [],
         },
         better: {
           price: betterPrice,
-          firstCleanPrice: firstCleanOverrides.better != null ? firstCleanOverrides.better + (adjustment.amount || 0) : (quote.better.firstCleanPrice != null ? quote.better.firstCleanPrice + (adjustment.amount || 0) : undefined),
-          name: "Better",
-          serviceTypeName: quote.better.name || "Standard Clean",
-          serviceTypeId: quote.better.serviceTypeId || "standard",
-          scope: aiScopes?.better || quote.better.scope || "",
+          firstCleanPrice: isFlatService
+            ? undefined
+            : (firstCleanOverrides.better != null ? firstCleanOverrides.better + (adjustment.amount || 0) : (quote.better.firstCleanPrice != null ? quote.better.firstCleanPrice + (adjustment.amount || 0) : undefined)),
+          name: isFlatService ? (selectedServiceType?.displayName || "Flat-Price Service") : "Better",
+          serviceTypeName: isFlatService
+            ? (selectedServiceType?.displayName || "Flat-Price Service")
+            : (quote.better.name || "Standard Clean"),
+          serviceTypeId: isFlatService
+            ? (selectedServiceType?.typeKey || "flat")
+            : (quote.better.serviceTypeId || "standard"),
+          scope: isFlatService ? "" : (aiScopes?.better || quote.better.scope || ""),
           addOnsIncluded: addOnOptions.filter(o => services.addOns[o.key]).map(o => o.label),
         },
         best: {
           price: bestPrice,
-          firstCleanPrice: firstCleanOverrides.best != null ? firstCleanOverrides.best + (adjustment.amount || 0) : (quote.best.firstCleanPrice != null ? quote.best.firstCleanPrice + (adjustment.amount || 0) : undefined),
-          name: "Best",
-          serviceTypeName: quote.best.name || "Deep Clean",
-          serviceTypeId: quote.best.serviceTypeId || "deep-clean",
-          scope: aiScopes?.best || quote.best.scope || "",
-          addOnsIncluded: ["Inside Oven", "Inside Cabinets", "Interior Windows", "Baseboards Detail", "Blinds Detail"],
+          firstCleanPrice: isFlatService
+            ? undefined
+            : (firstCleanOverrides.best != null ? firstCleanOverrides.best + (adjustment.amount || 0) : (quote.best.firstCleanPrice != null ? quote.best.firstCleanPrice + (adjustment.amount || 0) : undefined)),
+          name: isFlatService ? (selectedServiceType?.displayName || "Flat-Price Service") : "Best",
+          serviceTypeName: isFlatService
+            ? (selectedServiceType?.displayName || "Flat-Price Service")
+            : (quote.best.name || "Deep Clean"),
+          serviceTypeId: isFlatService
+            ? (selectedServiceType?.typeKey || "flat")
+            : (quote.best.serviceTypeId || "deep-clean"),
+          scope: isFlatService ? "" : (aiScopes?.best || quote.best.scope || ""),
+          addOnsIncluded: isFlatService
+            ? addOnOptions.filter(o => services.addOns[o.key]).map(o => o.label)
+            : ["Inside Oven", "Inside Cabinets", "Interior Windows", "Baseboards Detail", "Blinds Detail"],
         },
       },
       addOns: Object.fromEntries(
@@ -543,6 +701,8 @@ export default function QuoteCreatePage() {
           selectedCustomer?.address || buildAddress({ street: customerForm.street, city: customerForm.city, state: customerForm.state, zip: customerForm.zip, country: customerForm.country }) || "",
       },
       preferredDate: preferredDate || undefined,
+      serviceTypeId: serviceTypeId || undefined,
+      locationId: locationId || undefined,
     };
 
     createQuoteMutation.mutate(quoteData);
@@ -558,6 +718,69 @@ export default function QuoteCreatePage() {
       {/* ─── Left: form ─────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
       <PageHeader title="New Quote" backTo="/quotes" />
+
+      {visibleLocations.length > 1 && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            Location
+          </p>
+          <select
+            value={locationId || ""}
+            onChange={(e) => setLocationId(e.target.value || null)}
+            className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {visibleLocations.map((loc) => {
+              const sub = loc.address ? ` — ${loc.address}` : "";
+              return (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}{sub}
+                </option>
+              );
+            })}
+          </select>
+          <p className="mt-1.5 text-xs text-slate-500">
+            This quote will be assigned to the selected location. The customer-facing quote shows that location's contact details.
+          </p>
+        </div>
+      )}
+
+      {activeServiceTypes.length > 1 && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+            Service Type
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {activeServiceTypes.map((t) => {
+              const isSelected = t.id === serviceTypeId;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setServiceTypeId(t.id)}
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                    isSelected
+                      ? "bg-primary-600 border-primary-600 text-white"
+                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {t.displayName}
+                  {t.pricingModel === "flat" && (
+                    <span className={`ml-1.5 text-xs ${isSelected ? "text-primary-100" : "text-slate-400"}`}>
+                      · flat
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {selectedServiceType?.pricingModel === "flat" && (
+            <p className="mt-2 text-xs text-slate-500">
+              Flat-price quote. Customer sees a single price (no tier comparison).
+              Set the base price in <a href="/quote-preferences" className="text-primary-600 hover:underline">Quote Preferences</a>.
+            </p>
+          )}
+        </div>
+      )}
 
       {showQuotaNudge && (
         <div className="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
@@ -1285,6 +1508,83 @@ export default function QuoteCreatePage() {
               </div>
             </div>
 
+            {isFlatService ? (
+              <div className="rounded-xl border-2 border-primary-500 bg-primary-50/50 shadow-sm shadow-primary-600/5 p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-slate-900">
+                        {selectedServiceType?.displayName || "Flat-Price Service"}
+                      </h3>
+                      <span className="text-[10px] font-semibold uppercase bg-primary-600 text-white px-2 py-0.5 rounded-full">
+                        Flat Price
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Customer sees a single per-visit price (no Good/Better/Best comparison).
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-2">
+                      Auto-calculated from base + sqft. Set base price in{" "}
+                      <a href="/quote-preferences" className="text-primary-600 hover:underline">Quote Preferences</a>.
+                    </p>
+                  </div>
+                  <div
+                    className="shrink-0 cursor-text group/flatprice"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingFlatPrice(true);
+                      setEditingFlatValue(String((flatPriceBase + (adjustment.amount || 0)).toFixed(0)));
+                    }}
+                  >
+                    {editingFlatPrice ? (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-3xl font-bold text-slate-900 tracking-tight">$</span>
+                        <input
+                          autoFocus
+                          type="number"
+                          min={1}
+                          value={editingFlatValue}
+                          onChange={(e) => setEditingFlatValue(e.target.value)}
+                          onBlur={() => {
+                            const parsed = parseFloat(editingFlatValue.replace(/[^0-9.]/g, ""));
+                            if (!isNaN(parsed) && parsed > 0) {
+                              setFlatPriceOverride(Math.round(parsed) - (adjustment.amount || 0));
+                            }
+                            setEditingFlatPrice(false);
+                            setEditingFlatValue("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") { setEditingFlatPrice(false); setEditingFlatValue(""); }
+                          }}
+                          className="w-32 text-3xl font-bold text-slate-900 border border-primary-400 rounded px-2 py-0.5 tracking-tight focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                          ${(flatPriceBase + (adjustment.amount || 0)).toFixed(0)}
+                          {flatPriceOverride !== null ? (
+                            <span className="text-xs font-normal text-primary-600 ml-1.5">Edited</span>
+                          ) : null}
+                        </p>
+                        <Pencil className="w-3.5 h-3.5 text-slate-300 group-hover/flatprice:text-primary-500 transition-colors" />
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-400 text-right mt-1">per visit</p>
+                  </div>
+                </div>
+                {flatPriceOverride !== null ? (
+                  <button
+                    type="button"
+                    onClick={() => setFlatPriceOverride(null)}
+                    className="mt-3 text-[11px] text-slate-500 hover:text-primary-600 underline"
+                  >
+                    Reset to calculated price (${flatComputed})
+                  </button>
+                ) : null}
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {(["good", "better", "best"] as const).map((tier) => {
                 const data = quote[tier];
@@ -1466,9 +1766,10 @@ export default function QuoteCreatePage() {
                 );
               })}
             </div>
+            )}
 
-            {/* Better/Best upsell nudge — only for non-Growth/Pro users */}
-            {!isGrowth && !isPro ? (
+            {/* Better/Best upsell nudge — only for non-Growth/Pro users (hidden for flat-price services) */}
+            {!isFlatService && !isGrowth && !isPro ? (
               <div
                 className="rounded-xl px-4 py-3 flex items-center gap-3"
                 style={{ background: "linear-gradient(135deg, #f5f3ff, #fafaff)", border: "1px solid rgba(79,70,229,0.15)" }}
@@ -1494,7 +1795,7 @@ export default function QuoteCreatePage() {
               </div>
             ) : null}
 
-            {aiPriceOverrides ? (
+            {!isFlatService && aiPriceOverrides ? (
               <div className="flex">
                 <Button
                   variant="secondary"
@@ -1506,8 +1807,8 @@ export default function QuoteCreatePage() {
               </div>
             ) : null}
 
-            {/* AI Pricing Suggestion Panel */}
-            {aiPricing ? (
+            {/* AI Pricing Suggestion Panel — hidden for flat-price services */}
+            {!isFlatService && aiPricing ? (
               <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-4 space-y-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1634,29 +1935,43 @@ export default function QuoteCreatePage() {
                 ) : null}
               </div>
               <div className="border-t border-slate-200 mt-4 pt-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-900">
-                    {selectedOption.charAt(0).toUpperCase() +
-                      selectedOption.slice(1)}{" "}
-                    - {quote[selectedOption].name}
-                  </span>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary-600 tracking-tight">
-                      ${(aiPriceOverrides?.[selectedOption] ?? quote[selectedOption].price).toFixed(0)}
+                {isFlatService ? (
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-900">
+                      {selectedServiceType?.displayName || "Flat-Price Service"}
+                    </span>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary-600 tracking-tight">
+                        ${(flatPriceBase + (adjustment.amount || 0)).toFixed(0)}
+                        <span className="text-sm font-normal text-slate-400 ml-1">/visit</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-slate-900">
+                      {selectedOption.charAt(0).toUpperCase() +
+                        selectedOption.slice(1)}{" "}
+                      - {quote[selectedOption].name}
+                    </span>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary-600 tracking-tight">
+                        ${(aiPriceOverrides?.[selectedOption] ?? quote[selectedOption].price).toFixed(0)}
+                        {quote[selectedOption].firstCleanPrice ? (
+                          <span className="text-sm font-normal text-slate-400 ml-1">
+                            /visit
+                          </span>
+                        ) : null}
+                      </div>
                       {quote[selectedOption].firstCleanPrice ? (
-                        <span className="text-sm font-normal text-slate-400 ml-1">
-                          /visit
-                        </span>
+                        <div className="text-xs text-amber-600 font-medium mt-0.5">
+                          First visit: $
+                          {quote[selectedOption].firstCleanPrice.toFixed(0)}
+                        </div>
                       ) : null}
                     </div>
-                    {quote[selectedOption].firstCleanPrice ? (
-                      <div className="text-xs text-amber-600 font-medium mt-0.5">
-                        First visit: $
-                        {quote[selectedOption].firstCleanPrice.toFixed(0)}
-                      </div>
-                    ) : null}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1732,10 +2047,7 @@ export default function QuoteCreatePage() {
       <div className="hidden xl:block shrink-0">
         <LivePreviewPanel isEmpty={property.sqft === 0 && step < 1}>
           <ResidentialLivePreview
-            result={quote}
-            selectedTier={selectedOption}
-            priceOverride={aiPriceOverrides?.[selectedOption] ?? undefined}
-            adjustment={adjustment}
+            pricing={quotePricing}
             onAdjustmentChange={setAdjustment}
             frequency={services.frequency}
             beds={property.beds}

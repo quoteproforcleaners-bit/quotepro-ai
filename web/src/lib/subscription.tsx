@@ -148,7 +148,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   /** Fire-and-forget upgrade click tracking — never throws */
   const trackUpgradeClick = useCallback((plan: string, trigger?: string) => {
     apiPost("/api/analytics/events", {
-      event: "upgrade_clicked",
+      eventName: "upgrade_clicked",
       properties: { plan, trigger: trigger ?? "unknown", source: "web" },
     }).catch(() => {});
   }, []);

@@ -1543,6 +1543,7 @@ export function formatBusiness(b: any) {
     commLanguage: b.commLanguage || "en",
     currency: b.currency || "USD",
     languageSelected: b.languageSelected ?? false,
+    taxFeesSettings: b.taxFeesSettings || null,
   };
 }
 

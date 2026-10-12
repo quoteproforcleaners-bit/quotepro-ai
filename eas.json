@@ -3,6 +3,13 @@
     "version": ">= 3.0.0"
   },
   "build": {
+    "subscription-test": {
+      "extends": "preview",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "hotpink-glass-commas.replit.app"
+      }
+    },
     "production": {
       "env": {
         "EXPO_PUBLIC_DOMAIN": "asset-manager-1-mquealy01.replit.app",

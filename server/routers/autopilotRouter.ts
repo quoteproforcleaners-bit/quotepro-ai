@@ -385,6 +385,31 @@ router.post("/checkout", requireAuth, async (req: Request, res: Response) => {
     const user = await getUserById(req.session.userId!);
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // Duplicate autopilot-addon guard. The autopilot add-on is intentionally
+    // a second subscription alongside the main plan, so we can't block on
+    // "user has any live sub". Instead, scope to subs tagged with our
+    // autopilot_addon metadata and bail if any are already live.
+    const stripeCustomerId = (user as any).stripeCustomerId;
+    if (stripeCustomerId) {
+      try {
+        const live = new Set(["active", "trialing", "past_due", "unpaid"]);
+        const existing = await stripeClient.subscriptions.list({
+          customer: stripeCustomerId,
+          status: "all",
+          limit: 20,
+        });
+        const dup = existing.data.find(
+          (s: any) => live.has(s.status) && s.metadata?.type === "autopilot_addon"
+        );
+        if (dup) {
+          console.log(`[autopilot-checkout] user ${user.id} already has autopilot addon ${dup.id}; skipping`);
+          return res.json({ alreadyActive: true, subscriptionId: dup.id });
+        }
+      } catch (e: any) {
+        console.error("[autopilot-checkout] pre-check failed:", e?.message || e);
+      }
+    }
+
     const session = await stripeClient.checkout.sessions.create({
       mode: "subscription",
       customer_email: user.email,

@@ -22,7 +22,8 @@ const TOP_LEVEL_PATHS = [
   "/intake/", "/request/", "/schedule-ack/", "/q/", "/home/", "/tip/",
   "/book/",
   "/pricing", "/subscription", "/register",
-  "/login", "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
+  "/login", "/forgot-password", "/reset-password",
+  "/dashboard", "/onboarding", "/upgrade", "/quote-doctor",
   "/employee", "/checkin/", "/quotes", "/customers", "/jobs", "/calendar",
   "/settings", "/follow-ups", "/opportunities", "/growth", "/ai-assistant",
 ];

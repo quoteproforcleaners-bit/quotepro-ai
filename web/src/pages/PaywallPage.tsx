@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useSubscription } from "../lib/subscription";
+import { useSubscription, type BillingInterval } from "../lib/subscription";
 import { useAuth } from "../lib/auth";
 import { apiGet } from "../lib/api";
 import {
@@ -40,6 +40,7 @@ export default function PaywallPage() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const source = searchParams.get("source") || "general";
+  const [interval, setInterval] = useState<BillingInterval>("annual");
 
   useEffect(() => {
     if (sessionId) {
@@ -125,12 +126,45 @@ export default function PaywallPage() {
                     <div className="w-14 h-14 mx-auto rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 shadow-lg shadow-black/10">
                       <Zap className="w-7 h-7 text-white" />
                     </div>
-                    <p className="text-primary-100 text-sm font-medium mb-2">Growth Plan</p>
+                    <p className="text-primary-100 text-sm font-medium mb-3">Growth Plan</p>
+
+                    <div role="radiogroup" aria-label="Billing interval" className="inline-flex items-center bg-white/15 backdrop-blur-sm rounded-xl p-1 gap-1 mb-4">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={interval === "annual"}
+                        onClick={() => setInterval("annual")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                          interval === "annual" ? "bg-white text-primary-700 shadow-sm" : "text-white/80 hover:text-white"
+                        }`}
+                      >
+                        Annual
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-bold leading-none">
+                          2 MO FREE
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={interval === "monthly"}
+                        onClick={() => setInterval("monthly")}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                          interval === "monthly" ? "bg-white text-primary-700 shadow-sm" : "text-white/80 hover:text-white"
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                    </div>
+
                     <div className="flex items-end justify-center gap-1 mb-1">
-                      <span className="text-5xl font-bold tracking-tight">$49</span>
+                      <span className="text-5xl font-bold tracking-tight">${interval === "annual" ? 41 : 49}</span>
                       <span className="text-primary-200 text-sm mb-1.5">/mo</span>
                     </div>
-                    <p className="text-primary-200 text-sm">or $41/mo billed annually</p>
+                    {interval === "annual" ? (
+                      <p className="text-primary-200 text-sm">$492 billed annually · save $96/yr</p>
+                    ) : (
+                      <p className="text-primary-200 text-sm">Billed monthly · cancel anytime</p>
+                    )}
                     <p className="text-primary-200 text-xs mt-1 opacity-80">14-day free trial included</p>
                   </div>
                 </div>
@@ -140,7 +174,7 @@ export default function PaywallPage() {
                     variant="primary"
                     size="lg"
                     icon={ArrowRight}
-                    onClick={() => startCheckout("growth", "monthly")}
+                    onClick={() => startCheckout("growth", interval)}
                     loading={checkoutLoading}
                     className="w-full justify-center text-base font-semibold py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 shadow-lg shadow-primary-600/25"
                   >
@@ -159,7 +193,9 @@ export default function PaywallPage() {
                   </div>
 
                   <p className="text-center text-xs text-slate-400 pt-2">
-                    Cancel anytime. No commitment.
+                    {interval === "annual"
+                      ? "After 14 days, $492 billed annually. Cancel anytime."
+                      : "After 14 days, $49 billed monthly. Cancel anytime."}
                   </p>
                   <p className="text-center text-[11px] text-slate-400 pt-1 leading-relaxed">
                     <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms of Use</a>

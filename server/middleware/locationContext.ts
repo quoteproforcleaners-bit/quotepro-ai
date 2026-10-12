@@ -28,29 +28,56 @@ export async function locationContext(
   if (!req.session?.userId) return next();
 
   try {
-    // 1. Explicit header override
+    // 1. Explicit header override — must be a location the caller owns and
+    // that is active. Untrusted client input cannot widen scope.
     const headerId = req.headers["x-location-id"] as string | undefined;
     if (headerId) {
-      req.activeLocationId = headerId;
-      return next();
+      const { rows: ownedHeader } = await pool.query<{ id: string }>(
+        "SELECT id FROM business_locations WHERE id = $1 AND owner_id = $2 AND active = true",
+        [headerId, req.session.userId]
+      );
+      if (ownedHeader[0]) {
+        req.activeLocationId = ownedHeader[0].id;
+        return next();
+      }
+      // fall through to persisted resolution if header was invalid
     }
 
-    // 2. User's persisted active_location_id, or fall back to primary
+    // 2. Resolve persisted active_location_id, validating it still points
+    // at an owned, active location. Auto-repair to primary / oldest if not.
     const { rows } = await pool.query<{
       active_location_id: string | null;
-      primary_id: string | null;
+      validated_id: string | null;
+      fallback_id: string | null;
     }>(
       `SELECT u.active_location_id,
               (SELECT bl.id FROM business_locations bl
-               WHERE bl.owner_id = u.id AND bl.is_primary = true AND bl.active = true
-               LIMIT 1) AS primary_id
-       FROM users u
-       WHERE u.id = $1`,
+                WHERE bl.id = u.active_location_id
+                  AND bl.owner_id = u.id
+                  AND bl.active = true
+                LIMIT 1) AS validated_id,
+              (SELECT bl.id FROM business_locations bl
+                WHERE bl.owner_id = u.id AND bl.active = true
+                ORDER BY bl.is_primary DESC, bl.created_at ASC
+                LIMIT 1) AS fallback_id
+         FROM users u
+        WHERE u.id = $1`,
       [req.session.userId]
     );
 
-    if (rows[0]) {
-      req.activeLocationId = rows[0].active_location_id ?? rows[0].primary_id ?? null;
+    if (!rows[0]) {
+      req.activeLocationId = null;
+    } else if (rows[0].validated_id) {
+      req.activeLocationId = rows[0].validated_id;
+    } else if (rows[0].fallback_id) {
+      // Stale or null pointer — repair persistently so we don't re-query.
+      req.activeLocationId = rows[0].fallback_id;
+      pool
+        .query("UPDATE users SET active_location_id = $1 WHERE id = $2", [
+          rows[0].fallback_id,
+          req.session.userId,
+        ])
+        .catch(() => {});
     } else {
       req.activeLocationId = null;
     }

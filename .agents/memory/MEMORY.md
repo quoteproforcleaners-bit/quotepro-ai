@@ -1,0 +1,3 @@
+- [User anonymization](user-anonymization.md) — honoring account-deletion in prod; admin endpoint is the only write path; auth_provider is NOT NULL (use 'deleted', never null); rotated secret needs redeploy.
+- [Release scope](release-scope.md) — preserve the previously published app; pricing-only update and mandatory iPhone purchase verification.
+- [RevenueCat API versions](revenuecat-api-versions.md) — a V2 legacy-key rejection does not invalidate a V1 server key; verify the intended app separately.

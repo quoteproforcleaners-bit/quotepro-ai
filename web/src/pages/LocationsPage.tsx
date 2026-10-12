@@ -5,7 +5,6 @@ import {
   MapPin,
   Plus,
   Pencil,
-  ToggleLeft,
   Phone,
   Clock,
   FileText,
@@ -14,6 +13,7 @@ import {
   Star,
   X,
   Check,
+  ArrowRightLeft,
 } from "lucide-react";
 import { apiRequest } from "../lib/api";
 import { PageHeader, Button, Card } from "../components/ui";
@@ -66,11 +66,13 @@ function LocationModal({
   onClose,
   onSave,
   isSaving,
+  errorMessage,
 }: {
   location: Location | null;
   onClose: () => void;
   onSave: (data: LocationForm) => void;
   isSaving: boolean;
+  errorMessage: string | null;
 }) {
   const [form, setForm] = useState<LocationForm>(
     location
@@ -147,6 +149,11 @@ function LocationModal({
             </select>
           </div>
         </div>
+        {errorMessage && (
+          <div className="mx-6 mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100">
           <button
             onClick={onClose}
@@ -172,18 +179,18 @@ function LocationModal({
 function LocationCard({
   location,
   onEdit,
-  onDeactivate,
   onSwitch,
   isActive,
+  showSwitch,
 }: {
   location: Location;
   onEdit: () => void;
-  onDeactivate: () => void;
   onSwitch: () => void;
   isActive: boolean;
+  showSwitch: boolean;
 }) {
   return (
-    <Card className={`p-5 transition-all ${isActive ? "ring-2 ring-primary-500" : ""}`}>
+    <Card className={`p-5 transition-all ${isActive ? "ring-2 ring-emerald-500" : ""}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -193,12 +200,11 @@ function LocationCard({
                 <Star className="w-3 h-3" /> Primary
               </span>
             )}
-            {isActive && (
-              <span className="px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 text-xs font-semibold">
-                Active
+            {isActive ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                <Check className="w-3 h-3" /> Active
               </span>
-            )}
-            {!location.active && (
+            ) : (
               <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">
                 Inactive
               </span>
@@ -224,12 +230,13 @@ function LocationCard({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!isActive && location.active && (
+          {!isActive && showSwitch && (
             <button
               onClick={onSwitch}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 text-white hover:bg-primary-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 text-white hover:bg-primary-700"
             >
-              Switch
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Switch to this location
             </button>
           )}
           <button
@@ -239,15 +246,6 @@ function LocationCard({
           >
             <Pencil className="w-3.5 h-3.5" />
           </button>
-          {!location.is_primary && location.active && (
-            <button
-              onClick={onDeactivate}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500"
-              title="Deactivate"
-            >
-              <ToggleLeft className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -258,6 +256,67 @@ function LocationCard({
         <Stat icon={Users} label="Customers" value={location.customer_count} />
       </div>
     </Card>
+  );
+}
+
+// ─── Switch Confirmation Modal ───────────────────────────────────────────────
+
+function SwitchConfirmModal({
+  target,
+  current,
+  onCancel,
+  onConfirm,
+  isPending,
+}: {
+  target: Location;
+  current: Location | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-900">Switch to {target.name}?</h2>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-sm text-slate-600 mb-5">
+          Your active location will change
+          {current ? <> from <span className="font-semibold text-slate-900">{current.name}</span></> : null}
+          {" "}to <span className="font-semibold text-slate-900">{target.name}</span>.
+          Quotes, jobs, and customers will now scope to this location. You can switch back
+          anytime.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {isPending ? "Switching…" : "Switch Location"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -279,6 +338,7 @@ export default function LocationsPage() {
   const qc = useQueryClient();
 
   const [modal, setModal] = useState<"new" | Location | null>(null);
+  const [switchTarget, setSwitchTarget] = useState<Location | null>(null);
 
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -296,7 +356,7 @@ export default function LocationsPage() {
       const res = await fetch("/api/auth/me", { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       const d = await res.json();
-      return { activeLocationId: d.activeLocationId ?? null };
+      return { activeLocationId: d.user?.activeLocationId ?? d.activeLocationId ?? null };
     },
     staleTime: 30000,
   });
@@ -319,16 +379,12 @@ export default function LocationsPage() {
     },
   });
 
-  const deactivateMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/locations/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/locations"] }),
-  });
-
   const switchMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/locations/${id}/switch`),
+    mutationFn: (id: string) => apiRequest("POST", `/api/locations/${id}/activate`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/locations"] });
       qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      setSwitchTarget(null);
     },
   });
 
@@ -414,26 +470,65 @@ export default function LocationsPage() {
           <p className="text-slate-500 text-sm">No locations found. Add your first one above.</p>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {locations.map((loc) => (
-            <LocationCard
-              key={loc.id}
-              location={loc}
-              isActive={loc.id === userData?.activeLocationId}
-              onEdit={() => setModal(loc)}
-              onDeactivate={() => deactivateMutation.mutate(loc.id)}
-              onSwitch={() => switchMutation.mutate(loc.id)}
-            />
-          ))}
-        </div>
+        <>
+          {(() => {
+            const activeLoc = locations.find((l) => l.id === userData?.activeLocationId) ?? null;
+            if (!activeLoc) return null;
+            return (
+              <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-900">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>
+                  Active location: <span className="font-semibold">{activeLoc.name}</span>
+                  {" "}— all new quotes and jobs will be assigned here.
+                </span>
+              </div>
+            );
+          })()}
+          <div className="space-y-4">
+            {locations.map((loc) => (
+              <LocationCard
+                key={loc.id}
+                location={loc}
+                isActive={loc.id === userData?.activeLocationId}
+                showSwitch={
+                  // Show switch CTA whenever the user has another location
+                  // to switch to — OR whenever the current row is not the
+                  // operating context (recovery path if state is stale).
+                  locations.length > 1 || loc.id !== userData?.activeLocationId
+                }
+                onEdit={() => setModal(loc)}
+                onSwitch={() => setSwitchTarget(loc)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {switchTarget && (
+        <SwitchConfirmModal
+          target={switchTarget}
+          current={locations.find((l) => l.id === userData?.activeLocationId) ?? null}
+          onCancel={() => setSwitchTarget(null)}
+          onConfirm={() => switchMutation.mutate(switchTarget.id)}
+          isPending={switchMutation.isPending}
+        />
       )}
 
       {modal !== null && (
         <LocationModal
           location={modal === "new" ? null : modal}
-          onClose={() => setModal(null)}
+          onClose={() => {
+            createMutation.reset();
+            updateMutation.reset();
+            setModal(null);
+          }}
           onSave={handleSave}
           isSaving={isSaving}
+          errorMessage={
+            (createMutation.error as Error | null)?.message ||
+            (updateMutation.error as Error | null)?.message ||
+            null
+          }
         />
       )}
     </div>

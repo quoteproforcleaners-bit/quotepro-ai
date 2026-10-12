@@ -38,9 +38,6 @@ import WalkthroughAIScreen from "@/screens/WalkthroughAIScreen";
 import WalkthroughResultsScreen from "@/screens/WalkthroughResultsScreen";
 import WalkthroughEditScreen from "@/screens/WalkthroughEditScreen";
 import ClosingAssistantScreen from "@/screens/ClosingAssistantScreen";
-import LeadFinderScreen from "@/screens/LeadFinderScreen";
-import LeadFinderDetailScreen from "@/screens/LeadFinderDetailScreen";
-import LeadFinderSettingsScreen from "@/screens/LeadFinderSettingsScreen";
 import LeadCaptureSettingsScreen from "@/screens/LeadCaptureSettingsScreen";
 import AIAgentIntroScreen from "@/screens/AIAgentIntroScreen";
 import NPSSurveyModal from "@/screens/NPSSurveyModal";
@@ -50,6 +47,9 @@ import AutopilotScreen from "@/screens/AutopilotScreen";
 import AvailabilityScreen from "@/screens/AvailabilityScreen";
 import BookingsScreen from "@/screens/BookingsScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import AIConciergeSettingsScreen from "@/screens/AIConciergeSettingsScreen";
+import AIConciergeConversationsScreen from "@/screens/AIConciergeConversationsScreen";
+import AIConciergeInsightsScreen from "@/screens/AIConciergeInsightsScreen";
 
 import LoginScreen from "@/screens/auth/LoginScreen";
 import LandingScreen from "@/screens/LandingScreen";
@@ -98,9 +98,6 @@ export type RootStackParamList = {
   WalkthroughResults: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
   WalkthroughEdit: { extractedFields: any; assumptions: string[]; confidence: string; description: string };
   ClosingAssistant: { quoteAmount?: number; serviceType?: string; frequency?: string; addOns?: string[]; customerName?: string; notes?: string; pricingSummary?: string } | undefined;
-  LeadFinder: undefined;
-  LeadFinderDetail: { leadId: string };
-  LeadFinderSettings: undefined;
   LeadCaptureSettings: undefined;
   AIAgentIntro: undefined;
   QuoteDoctor: undefined;
@@ -109,6 +106,9 @@ export type RootStackParamList = {
   Availability: undefined;
   Bookings: undefined;
   Settings: undefined;
+  AIConciergeSettings: undefined;
+  AIConciergeConversations: undefined;
+  AIConciergeInsights: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -543,27 +543,6 @@ export default function RootStackNavigator() {
             }}
           />
           <Stack.Screen
-            name="LeadFinder"
-            component={LeadFinderScreen}
-            options={{
-              headerTitle: "Local Lead Finder",
-            }}
-          />
-          <Stack.Screen
-            name="LeadFinderDetail"
-            component={LeadFinderDetailScreen}
-            options={{
-              headerTitle: "Lead Detail",
-            }}
-          />
-          <Stack.Screen
-            name="LeadFinderSettings"
-            component={LeadFinderSettingsScreen}
-            options={{
-              headerTitle: "Lead Finder Settings",
-            }}
-          />
-          <Stack.Screen
             name="LeadCaptureSettings"
             component={LeadCaptureSettingsScreen}
             options={{
@@ -610,6 +589,27 @@ export default function RootStackNavigator() {
             component={SettingsScreen}
             options={{
               headerTitle: "Settings",
+            }}
+          />
+          <Stack.Screen
+            name="AIConciergeSettings"
+            component={AIConciergeSettingsScreen}
+            options={{
+              headerTitle: "AI Concierge",
+            }}
+          />
+          <Stack.Screen
+            name="AIConciergeConversations"
+            component={AIConciergeConversationsScreen}
+            options={{
+              headerTitle: "Conversations",
+            }}
+          />
+          <Stack.Screen
+            name="AIConciergeInsights"
+            component={AIConciergeInsightsScreen}
+            options={{
+              headerTitle: "Concierge Insights",
             }}
           />
           <Stack.Screen

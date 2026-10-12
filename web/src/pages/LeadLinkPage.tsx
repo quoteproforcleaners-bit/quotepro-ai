@@ -51,6 +51,7 @@ const SERVICE_TYPES = [
   { id: "standard", label: "Standard Clean", desc: "Regular recurring or one-time clean" },
   { id: "deep", label: "Deep Clean", desc: "Thorough top-to-bottom cleaning" },
   { id: "move", label: "Move In/Out", desc: "Moving into or out of a home" },
+  { id: "airbnb", label: "Airbnb Turnover", desc: "Quick turnover cleaning between guests" },
   { id: "post_construction", label: "Post-Construction", desc: "After renovation or construction" },
 ];
 

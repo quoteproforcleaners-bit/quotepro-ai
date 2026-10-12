@@ -34,12 +34,29 @@ export async function initPortalTables() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    // Lead Capture / Public Quote Request columns — restored after a
+    // db:push --force incident (May 2026) dropped them. Keep these as
+    // startup migrations so any future schema-sync mishap can't take
+    // down the public lead capture page again.
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS chat_widget_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS chat_widget_color TEXT`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_slug TEXT`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS public_quote_button_text TEXT NOT NULL DEFAULT 'Get a Free Quote'`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS intake_code TEXT`);
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS lead_link_guide_sent_at TIMESTAMP`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS businesses_public_quote_slug_unique ON businesses(public_quote_slug) WHERE public_quote_slug IS NOT NULL`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS businesses_intake_code_unique ON businesses(intake_code) WHERE intake_code IS NOT NULL`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_enabled BOOLEAN NOT NULL DEFAULT TRUE`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_color TEXT`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS portal_welcome_message TEXT`);
     // Tips infrastructure
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tips_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
-    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_percentage_options JSONB DEFAULT '[15, 18, 20, 25]'`);
+    // NOTE: prod created this column as INTEGER[] (int4[]) historically.
+    // Keep the dev startup migration aligned to that type so the publish
+    // diff doesn't try to ALTER ... SET DATA TYPE jsonb (which can't be
+    // auto-cast and blocks deploys).
+    await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_percentage_options INTEGER[] DEFAULT '{15,18,20,25}'`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_distribution_percent INTEGER DEFAULT 100`);
     await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tip_request_delay INTEGER DEFAULT 2`);
     await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tip_token VARCHAR(64)`);

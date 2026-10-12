@@ -66,6 +66,7 @@ import quotesRouter from "./routers/quotesRouter";         // /api/quotes/*, /ap
 import customersRouter from "./routers/customersRouter";   // /api/customers/*, /api/intake-requests/*
 import jobsRouter from "./routers/jobsRouter";             // /api/jobs/*, /api/schedule/*, /api/dispatch/*
 import businessRouter from "./routers/businessRouter";     // /api/business/*, /api/subscription/*, /api/settings, /api/preferences, /api/files, /api/tasks, /api/referrals, /api/badges, /api/communications, /api/analytics, /api/geocode, /api/lead-link, /api/tip-settings, /api/tips
+import teamRouter from "./routers/teamRouter";             // /api/team/*, /api/invitations/* — RBAC team management
 import aiRouter from "./routers/ai/index";                  // /api/ai/*, /api/send/*, /api/lead-finder/*
 import automationsRouter from "./routers/automationsRouter"; // /api/automations, /api/social/*, /api/streaks
 import integrationsRouter from "./routers/integrationsRouter"; // /api/google-calendar/*, /api/stripe/*, /api/api-keys, /api/webhook-endpoints, /api/internal/*
@@ -73,6 +74,10 @@ import gbpRouter from "./routers/gbpRouter"; // /api/gbp/*
 
 // ─── Group C — hybrid routers with static pages (mounted at root) ─────────────
 import publicRouter from "./routers/publicRouter";         // /api/public/*, /q, /privacy, /terms, /calculators
+import aiConciergeRouter from "./routers/aiConciergeRouter"; // /api/quote/:quoteId/ai/* — customer-facing AI widget
+import aiConciergeAdminRouter from "./routers/aiConciergeAdminRouter"; // /api/business/ai-concierge/* — owner-facing AI widget admin
+import publicApiRouter from "./routers/publicApiRouter"; // /api/v1/* — Pro-tier public API (Bearer auth)
+import serviceTypesRouter from "./routers/serviceTypesRouter"; // /api/service-types/* — owner-managed service type catalog
 import portalRouter from "./routers/portalRouter";         // /api/portal/*, /portal-manifest/*, /api/portal-stats
 import winLossRouter from "./routers/winLossRouter";       // /feedback/:token (public), /api/win-loss
 
@@ -86,6 +91,11 @@ declare module "express-session" {
   interface SessionData {
     userId: string;
     appleOAuthState?: string;
+    // Phase 1 RBAC: which workspace the user is currently acting in.
+    // Lazily populated by membership middleware in Phase 2; safe to be
+    // unset for legacy single-business owner flows that still resolve
+    // via getBusinessByOwner(userId).
+    currentBusinessId?: string;
   }
 }
 
@@ -129,12 +139,28 @@ function setupSession(app: Express) {
 
 // ─── Main Route Registration ──────────────────────────────────────────────────
 
+import paidAccessRouter, { requirePaidAccess } from "./routers/paidAccessRouter";
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // 1. Initialise external clients
   await initStripeClient();
 
   // 2. Session middleware
   setupSession(app);
+
+  // Apply paid policy before legacy routers so old clients cannot bypass it.
+  app.use("/api", paidAccessRouter);
+  app.use("/api/quotes", (req, res, next) => {
+    // Historical customer records remain readable; creating, changing or sending requires payment.
+    const ai = /\/(generate-email|followup-preview|recommendations)(\/|$)/.test(req.path);
+    if (req.method === "GET" && !ai) return next();
+    return requirePaidAccess(ai)(req, res, next);
+  });
+  app.use("/api/pricing/calculate", requirePaidAccess());
+  app.use("/api/commercial", requirePaidAccess());
+  app.use(["/api/ai", "/api/sms/generate-draft", "/api/quote-doctor",
+    "/api/intelligence", "/api/autopilot", "/api/lead-finder",
+    "/api/business/ai-concierge", "/api/pricing/analyze"], requirePaidAccess(true));
 
   // 3. Mount Group A — pure single-domain routers
   app.use("/api/admin", adminRouter);
@@ -146,6 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/pricing", pricingRouter);
   app.use("/api/support", supportRouter);
   app.use("/api/quote-doctor", quoteDoctorRouter);
+  app.use("/api/service-types", serviceTypesRouter);
   app.use("/api", recurringRouter);
   app.use("/api", staffRouter);
   app.use("/api/booking", bookingWidgetRouter);
@@ -165,8 +192,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", integrationsRouter);
   app.use("/api/gbp", gbpRouter);
   app.use("/api", businessRouter);
+  app.use("/api", teamRouter);
 
   // 5. Mount Group C — hybrid routers at root (API + static pages)
+  app.use(aiConciergeRouter);
+  app.use(aiConciergeAdminRouter);
+  app.use(publicApiRouter);
   app.use(publicRouter);
   app.use(portalRouter);
   app.use(winLossRouter);

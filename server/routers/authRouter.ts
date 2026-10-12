@@ -25,7 +25,7 @@ import {
   syncJobToGoogleCalendar,
 } from "../helpers";
 import { enrollUserInDrip } from "../dripEmails";
-import { sendWelcomeEmail, sendSignupNotification } from "../mail";
+import { sendWelcomeEmail, sendSignupNotification, sendEmail } from "../mail";
 import { trackEvent } from "../analytics";
 import { AnalyticsEvents } from "../../shared/analytics-events";
 import { syncRcUserTier } from "./revenuecatRouter";
@@ -84,6 +84,37 @@ import { pendingAuthTokens, generateAuthToken } from "../clients";
 
 const router = Router();
 
+// Password reset tokens table — fire-and-forget at module load.
+pool.query(`
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`).then(() =>
+  pool.query(`CREATE INDEX IF NOT EXISTS password_reset_tokens_user_id_idx ON password_reset_tokens(user_id)`)
+).catch((err) => console.error("[auth] password_reset_tokens init failed:", err));
+
+// Shared password strength policy — used by register AND reset.
+const COMMON_PASSWORDS = [
+  "password", "password1", "password12", "password123",
+  "123456789", "1234567890", "12345678901",
+  "qwertyuiop", "qwerty123",
+  "iloveyou1", "admin12345", "welcome123",
+  "letmein123", "monkey1234", "dragon12345",
+];
+function validatePasswordPolicy(password: string): string | null {
+  if (typeof password !== "string" || password.length < 10) {
+    return "Password must be at least 10 characters";
+  }
+  if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
+    return "Please choose a stronger password";
+  }
+  return null;
+}
+
 // Extracts marketing attribution (where a signup came from) from a request.
 // Looks at the JSON body first, then the query string. Accepts either snake_case
 // (utm_source/utm_campaign — the marketing standard) or camelCase
@@ -136,19 +167,9 @@ function extractSignupAttribution(req: Request): {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      if (password.length < 10) {
-        return res.status(400).json({ message: "Password must be at least 10 characters" });
-      }
-
-      const COMMON_PASSWORDS = [
-        "password", "password1", "password12", "password123",
-        "123456789", "1234567890", "12345678901",
-        "qwertyuiop", "qwerty123",
-        "iloveyou1", "admin12345", "welcome123",
-        "letmein123", "monkey1234", "dragon12345",
-      ];
-      if (COMMON_PASSWORDS.includes(password.toLowerCase())) {
-        return res.status(400).json({ message: "Please choose a stronger password" });
+      const policyError = validatePasswordPolicy(password);
+      if (policyError) {
+        return res.status(400).json({ message: policyError });
       }
 
       const existing = await getUserByEmail(email);
@@ -187,7 +208,7 @@ function extractSignupAttribution(req: Request): {
         authProvider: "email",
         referralCode,
         referredBy,
-        trialStartedAt: new Date(),
+        trialStartedAt: null,
         signupIp,
         signupSource: signupSource || (referredBy ? "referral" : null),
         signupCampaign,
@@ -208,7 +229,6 @@ function extractSignupAttribution(req: Request): {
         signupSource: signupSource || (referredBy ? "referral" : null),
         signupCampaign,
       }).catch(() => {});
-      trackEvent(user.id, AnalyticsEvents.TRIAL_STARTED, { plan: "free" }).catch(() => {});
 
       await new Promise<void>((resolve, reject) => {
         req.session.regenerate((err) => (err ? reject(err) : resolve()));
@@ -259,7 +279,6 @@ function extractSignupAttribution(req: Request): {
 
       // Backfill trialStartedAt and referralCode for older accounts
       const backfillData: Record<string, any> = {};
-      if (!(user as any).trialStartedAt) backfillData.trialStartedAt = new Date();
       if (!(user as any).referralCode) {
         backfillData.referralCode = crypto.randomBytes(4).toString("hex").toUpperCase();
       }
@@ -1018,6 +1037,111 @@ h2{margin:0 0 8px;color:#333;}p{color:#666;margin:0;}</style>
     } catch (error: any) {
       console.error("contact-email update error:", error);
       return res.status(500).json({ message: "Failed to save email" });
+    }
+  });
+
+  // ─── Forgot password ────────────────────────────────────────────────
+  // Always returns 200 to prevent email enumeration. Sends reset email
+  // only if the account exists AND was created with email/password
+  // (not Google/Apple SSO).
+  router.post("/auth/forgot-password", authLimiter, async (req: Request, res: Response) => {
+    const rawEmail = String(req.body?.email || "").toLowerCase().trim();
+    if (!rawEmail || !rawEmail.includes("@")) {
+      return res.status(400).json({ message: "Valid email is required" });
+    }
+    const baseUrl = getPublicBaseUrl(req);
+
+    // Respond immediately to eliminate timing-based account enumeration.
+    res.json({ ok: true });
+
+    // All real work happens after the response is sent.
+    setImmediate(async () => {
+      try {
+        const user = await getUserByEmail(rawEmail);
+        if (!user || !user.passwordHash) return; // unknown or SSO-only
+
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        await pool.query(
+          `INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+          [tokenHash, user.id, expiresAt]
+        );
+        await pool.query(
+          `UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL AND token_hash <> $2`,
+          [user.id, tokenHash]
+        );
+
+        const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+        const html = `
+          <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#0f172a">
+            <h1 style="font-size:22px;font-weight:700;margin:0 0 16px">Reset your QuotePro password</h1>
+            <p style="font-size:15px;line-height:1.55;color:#334155;margin:0 0 24px">
+              We got a request to reset the password for your QuotePro account. Click the button below to choose a new one. This link expires in 60 minutes.
+            </p>
+            <p style="margin:0 0 24px"><a href="${resetUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:10px;font-size:15px">Reset password</a></p>
+            <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 8px">Or paste this URL into your browser:</p>
+            <p style="font-size:13px;color:#2563eb;word-break:break-all;margin:0 0 24px">${resetUrl}</p>
+            <p style="font-size:13px;color:#94a3b8;line-height:1.55;margin:24px 0 0">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+          </div>
+        `;
+        await sendEmail({
+          to: user.email,
+          subject: "Reset your QuotePro password",
+          html,
+          text: `Reset your QuotePro password: ${resetUrl}\n\nThis link expires in 60 minutes. If you didn't request this, ignore this email.`,
+        });
+      } catch (err) {
+        console.error("[auth] forgot-password background work failed:", err);
+      }
+    });
+  });
+
+  // ─── Reset password ─────────────────────────────────────────────────
+  router.post("/auth/reset-password", authLimiter, async (req: Request, res: Response) => {
+    try {
+      const token = String(req.body?.token || "").trim();
+      const password = String(req.body?.password || "");
+      if (!token || token.length < 32) {
+        return res.status(400).json({ message: "Invalid or missing reset token." });
+      }
+      const policyError = validatePasswordPolicy(password);
+      if (policyError) {
+        return res.status(400).json({ message: policyError });
+      }
+
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+      // Atomic claim: only one concurrent caller will get a row back.
+      const claim = await pool.query(
+        `UPDATE password_reset_tokens
+            SET used_at = NOW()
+          WHERE token_hash = $1
+            AND used_at IS NULL
+            AND expires_at > NOW()
+        RETURNING user_id`,
+        [tokenHash]
+      );
+      if (claim.rowCount === 0) {
+        return res.status(400).json({
+          message: "Reset link is invalid, expired, or already used. Request a new one.",
+        });
+      }
+      const userId = claim.rows[0].user_id;
+
+      const newHash = await bcrypt.hash(password, 12);
+      await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [newHash, userId]);
+      // Invalidate any other outstanding tokens for the user.
+      await pool.query(
+        `UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL`,
+        [userId]
+      );
+
+      return res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[auth] reset-password error:", err);
+      return res.status(500).json({ message: "Could not reset password. Try again." });
     }
   });
 

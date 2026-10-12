@@ -36,17 +36,14 @@ router.get("/locations", requireAuth, async (req: Request, res: Response) => {
 // ─── POST /api/locations ──────────────────────────────────────────────────────
 router.post("/locations", requireAuth, async (req: Request, res: Response) => {
   try {
-    // Verify multi-location is enabled for this user
-    const { rows: userRows } = await pool.query(
-      "SELECT is_multi_location_enabled FROM users WHERE id = $1",
+    // Page-level gating (Pro / trial / preview eligibility) is enforced on
+    // the frontend by useSubscription — server just verifies the caller is
+    // authenticated and scopes the new row to owner_id. Auto-flip the
+    // legacy flag so LocationSwitcher and other UI gates pick it up.
+    await pool.query(
+      "UPDATE users SET is_multi_location_enabled = true WHERE id = $1 AND COALESCE(is_multi_location_enabled, false) = false",
       [req.session.userId!]
     );
-    if (!userRows[0]?.is_multi_location_enabled) {
-      return res.status(403).json({
-        error: "not_enabled",
-        message: "Multi-location is not enabled for your account. Upgrade to enable it.",
-      });
-    }
 
     const { name, address, phone, timezone } = req.body as {
       name: string;
@@ -72,6 +69,15 @@ router.post("/locations", requireAuth, async (req: Request, res: Response) => {
       ]
     );
 
+    // First-location-ever for this user → auto-activate so the account is
+    // never in a "no operating context" state.
+    await pool.query(
+      `UPDATE users
+         SET active_location_id = $1
+       WHERE id = $2 AND active_location_id IS NULL`,
+      [rows[0].id, req.session.userId!]
+    );
+
     return res.status(201).json(rows[0]);
   } catch (e: any) {
     console.error("[locations] create error:", e.message);
@@ -83,6 +89,9 @@ router.post("/locations", requireAuth, async (req: Request, res: Response) => {
 router.patch("/locations/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    // NOTE: `active` is intentionally not patchable. Operating context is
+    // owned by users.active_location_id; soft-delete is owned by DELETE
+    // (which itself is gated on not-being-the-operating-context).
     const { name, address, phone, timezone } = req.body as {
       name?: string;
       address?: string;
@@ -130,14 +139,25 @@ router.delete("/locations/:id", requireAuth, async (req: Request, res: Response)
   try {
     const { id } = req.params;
 
-    // Cannot deactivate primary
+    // Cannot deactivate the operating-context location or the primary —
+    // active state is changed by ACTIVATING a different location, never by
+    // deactivating the current one.
     const { rows: check } = await pool.query(
-      "SELECT is_primary FROM business_locations WHERE id = $1 AND owner_id = $2",
+      `SELECT bl.is_primary,
+              (u.active_location_id = bl.id) AS is_operating_context
+         FROM business_locations bl
+         JOIN users u ON u.id = bl.owner_id
+        WHERE bl.id = $1 AND bl.owner_id = $2`,
       [id, req.session.userId!]
     );
     if (!check[0]) return res.status(404).json({ message: "Location not found" });
     if (check[0].is_primary) {
       return res.status(400).json({ message: "Cannot deactivate the primary location" });
+    }
+    if (check[0].is_operating_context) {
+      return res.status(400).json({
+        message: "Switch to a different location before deactivating this one.",
+      });
     }
 
     await pool.query(
@@ -153,29 +173,47 @@ router.delete("/locations/:id", requireAuth, async (req: Request, res: Response)
   }
 });
 
-// ─── POST /api/locations/:id/switch ──────────────────────────────────────────
-// Sets the user's active_location_id to the given location.
-router.post("/locations/:id/switch", requireAuth, async (req: Request, res: Response) => {
+// ─── POST /api/locations/:id/activate ────────────────────────────────────────
+// Atomically makes :id the user's operating-context location. The previous
+// active location is implicitly demoted (single-column FK on users enforces
+// "exactly one active" by construction — no partial unique index needed).
+// `/switch` is kept as an alias for the old client.
+async function activateLocation(req: Request, res: Response) {
   try {
     const { id } = req.params;
 
-    // Verify ownership
-    const { rows } = await pool.query(
-      "SELECT id, name FROM business_locations WHERE id = $1 AND owner_id = $2 AND active = true",
-      [id, req.session.userId!]
-    );
-    if (!rows[0]) return res.status(404).json({ message: "Location not found" });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    await pool.query(
-      "UPDATE users SET active_location_id = $1 WHERE id = $2",
-      [id, req.session.userId!]
-    );
+      const { rows } = await client.query(
+        "SELECT id, name FROM business_locations WHERE id = $1 AND owner_id = $2 AND active = true FOR UPDATE",
+        [id, req.session.userId!]
+      );
+      if (!rows[0]) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Location not found" });
+      }
 
-    return res.json({ message: "Switched location", location: rows[0] });
+      await client.query(
+        "UPDATE users SET active_location_id = $1 WHERE id = $2",
+        [id, req.session.userId!]
+      );
+
+      await client.query("COMMIT");
+      return res.json({ message: "Activated", location: rows[0] });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
   } catch (e: any) {
-    console.error("[locations] switch error:", e.message);
-    return res.status(500).json({ message: "Failed to switch location" });
+    console.error("[locations] activate error:", e.message);
+    return res.status(500).json({ message: "Failed to activate location" });
   }
-});
+}
+router.post("/locations/:id/activate", requireAuth, activateLocation);
+router.post("/locations/:id/switch", requireAuth, activateLocation);
 
 export default router;

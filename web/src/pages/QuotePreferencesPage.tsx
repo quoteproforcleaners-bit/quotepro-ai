@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Save, DollarSign, RefreshCw } from "lucide-react";
+import { Check, Save, DollarSign, RefreshCw, Percent, Info } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 
 // ─── Residential add-on defaults stored in localStorage ──────────────────────
 
@@ -276,6 +277,10 @@ export default function QuotePreferencesPage() {
         </Card>
       </div>
 
+      <TaxesAndFeesSection />
+
+      <ServiceTypesSection />
+
       <div>
         <SectionLabel>{t("quoteSettings.sections.serviceTiers")}</SectionLabel>
         <Card className="mt-3 space-y-5">
@@ -411,6 +416,514 @@ export default function QuotePreferencesPage() {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Service Types Offered (data-driven via /api/service-types) ──────────────
+
+interface ServiceTypeRow {
+  id: string;
+  typeKey: string;
+  displayName: string;
+  pricingModel: "tiered" | "flat";
+  pricingConfig: any;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+const TYPE_DESCRIPTIONS: Record<string, string> = {
+  residential_recurring: "Good / Better / Best tiered pricing — your default residential offering.",
+  deep_clean: "One-time top-to-bottom clean. Single flat price.",
+  move_in_out: "Move-in or move-out cleaning. Single flat price.",
+  post_construction: "After renovation or construction. Single flat price.",
+  airbnb: "Quick turnover between short-term guests. Single flat price.",
+  commercial: "Office or commercial space. Single flat price.",
+};
+
+function ServiceTypesSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery<{ serviceTypes: ServiceTypeRow[] }>({
+    queryKey: ["/api/service-types"],
+  });
+
+  const rows = data?.serviceTypes || [];
+
+  const patchRow = async (id: string, patch: Partial<ServiceTypeRow>) => {
+    // Optimistic update
+    queryClient.setQueryData<{ serviceTypes: ServiceTypeRow[] }>(
+      ["/api/service-types"],
+      (prev) => {
+        if (!prev) return prev;
+        return {
+          serviceTypes: prev.serviceTypes.map((r) =>
+            r.id === id ? { ...r, ...patch } : r,
+          ),
+        };
+      },
+    );
+    try {
+      await apiRequest("PATCH", `/api/service-types/${id}`, patch);
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-types"] });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div>
+        <SectionLabel>Service Types Offered</SectionLabel>
+        <Card className="mt-3 p-6 flex justify-center">
+          <Spinner />
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionLabel>Service Types Offered</SectionLabel>
+      <Card className="mt-3 p-0 divide-y divide-slate-100">
+        <div className="px-4 py-3 bg-slate-50 rounded-t-2xl">
+          <p className="text-sm text-slate-600">
+            Pick which clean types you offer. Each enabled type appears in the quote builder
+            and on customer quotes. Residential recurring is always active and uses your
+            Good/Better/Best tier pricing — every other type is a single flat price.
+          </p>
+        </div>
+        {rows.map((row) => {
+          const desc = TYPE_DESCRIPTIONS[row.typeKey] || "";
+          const isResidential = row.typeKey === "residential_recurring";
+          const flatBase = (row.pricingConfig?.basePrice ?? 0) as number;
+          return (
+            <div key={row.id} className="px-4 py-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={row.displayName}
+                    maxLength={80}
+                    onChange={(e) =>
+                      patchRow(row.id, { displayName: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-sm font-medium border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  {desc && (
+                    <p className="text-xs text-slate-500 mt-1.5">{desc}</p>
+                  )}
+                </div>
+                <div className="flex-shrink-0 pt-1">
+                  <Toggle
+                    checked={row.isActive}
+                    onChange={(v) => {
+                      if (isResidential && !v) return; // can't disable default
+                      patchRow(row.id, { isActive: v });
+                    }}
+                  />
+                </div>
+              </div>
+              {row.pricingModel === "flat" && row.isActive && (
+                <div className="flex items-center gap-3 pl-1">
+                  <label className="text-xs font-medium text-slate-500 w-24">
+                    Base price
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      step={5}
+                      value={flatBase}
+                      onChange={(e) =>
+                        patchRow(row.id, {
+                          pricingConfig: {
+                            ...row.pricingConfig,
+                            basePrice: Math.max(0, parseInt(e.target.value) || 0),
+                          },
+                        })
+                      }
+                      className="w-28 pl-6 pr-2 py-1.5 text-sm font-semibold text-center border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    Flat price shown on customer quote
+                  </span>
+                </div>
+              )}
+              {isResidential && (
+                <p className="text-xs text-slate-400 pl-1">
+                  Pricing for tiered residential cleans is managed in{" "}
+                  <a href="/settings" className="text-primary-600 hover:underline">
+                    Price Settings
+                  </a>
+                  .
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
+// ─── Taxes & Fees (account-level defaults) ───────────────────────────────────
+
+interface TaxFeesSettings {
+  tax: {
+    enabled: boolean;
+    rate: number;            // 0.0875 = 8.75%
+    label: string;           // e.g. "Sales Tax"
+    appliesTo: "subtotal" | "subtotal_plus_fee";
+  };
+  fee: {
+    enabled: boolean;
+    type: "flat" | "percentage";
+    value: number;           // dollars OR percent (e.g. 3 = 3%)
+    label: string;           // e.g. "Convenience Fee"
+    appliesTo: "all" | "card_only";
+    helperText: string;      // shown to customer
+  };
+}
+
+const DEFAULT_TAX_FEES: TaxFeesSettings = {
+  tax: {
+    enabled: false,
+    rate: 0,
+    label: "Sales Tax",
+    appliesTo: "subtotal",
+  },
+  fee: {
+    enabled: false,
+    type: "percentage",
+    value: 3,
+    label: "Convenience Fee",
+    appliesTo: "card_only",
+    helperText: "Helps cover card processing costs.",
+  },
+};
+
+function TaxesAndFeesSection() {
+  const queryClient = useQueryClient();
+  const { data: business, isLoading } = useQuery<any>({
+    queryKey: ["/api/business"],
+  });
+
+  const [settings, setSettings] = useState<TaxFeesSettings>(DEFAULT_TAX_FEES);
+  const [dirty, setDirty] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => {
+    if (business) {
+      const remote = (business.taxFeesSettings || {}) as Partial<TaxFeesSettings>;
+      setSettings({
+        tax: { ...DEFAULT_TAX_FEES.tax, ...(remote.tax || {}) },
+        fee: { ...DEFAULT_TAX_FEES.fee, ...(remote.fee || {}) },
+      });
+      setDirty(false);
+    }
+  }, [business]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (next: TaxFeesSettings) => {
+      const res = await apiRequest("PATCH", "/api/business", {
+        taxFeesSettings: next,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/business"] });
+      setDirty(false);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 2000);
+    },
+  });
+
+  const updateTax = (patch: Partial<TaxFeesSettings["tax"]>) => {
+    setSettings((s) => ({ ...s, tax: { ...s.tax, ...patch } }));
+    setDirty(true);
+  };
+  const updateFee = (patch: Partial<TaxFeesSettings["fee"]>) => {
+    setSettings((s) => ({ ...s, fee: { ...s.fee, ...patch } }));
+    setDirty(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div>
+        <SectionLabel>Taxes & Fees</SectionLabel>
+        <Card className="mt-3 p-6 flex justify-center">
+          <Spinner />
+        </Card>
+      </div>
+    );
+  }
+
+  // Display rate as percent string for editing (e.g. 0.0875 → "8.75")
+  const ratePct = settings.tax.rate ? (settings.tax.rate * 100).toFixed(4).replace(/\.?0+$/, "") : "";
+
+  return (
+    <div>
+      <SectionLabel>Taxes & Fees</SectionLabel>
+      <Card className="mt-3 p-0 divide-y divide-slate-100">
+        {/* ─── Sales Tax ─── */}
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Percent className="w-4 h-4 text-slate-500" />
+                <p className="text-sm font-semibold text-slate-900">Sales Tax</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Add a tax line to every quote. You're responsible for collecting and
+                remitting tax per your jurisdiction.
+              </p>
+            </div>
+            <Toggle
+              checked={settings.tax.enabled}
+              onChange={(v) => updateTax({ enabled: v })}
+            />
+          </div>
+
+          {settings.tax.enabled && (
+            <div className="space-y-3 pl-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">
+                    Rate (%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      step={0.001}
+                      value={ratePct}
+                      onChange={(e) => {
+                        const pct = parseFloat(e.target.value);
+                        updateTax({
+                          rate: isNaN(pct) ? 0 : Math.max(0, pct) / 100,
+                        });
+                      }}
+                      placeholder="8.75"
+                      className="w-full pl-3 pr-7 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                      %
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">
+                    Label on quote
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.tax.label}
+                    maxLength={40}
+                    onChange={(e) => updateTax({ label: e.target.value })}
+                    placeholder="Sales Tax"
+                    className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1.5">
+                  Apply tax to
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { v: "subtotal" as const, label: "Subtotal only" },
+                    { v: "subtotal_plus_fee" as const, label: "Subtotal + fee" },
+                  ].map((opt) => {
+                    const sel = settings.tax.appliesTo === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => updateTax({ appliesTo: opt.v })}
+                        className={`px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                          sel
+                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                            : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Convenience Fee ─── */}
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-slate-500" />
+                <p className="text-sm font-semibold text-slate-900">Convenience Fee</p>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Optional fee shown as its own line item on the quote.
+              </p>
+            </div>
+            <Toggle
+              checked={settings.fee.enabled}
+              onChange={(v) => updateFee({ enabled: v })}
+            />
+          </div>
+
+          {settings.fee.enabled && (
+            <div className="space-y-3 pl-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">
+                    Fee type
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { v: "flat" as const, label: "Flat $" },
+                      { v: "percentage" as const, label: "Percent %" },
+                    ].map((opt) => {
+                      const sel = settings.fee.type === opt.v;
+                      return (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => updateFee({ type: opt.v })}
+                          className={`px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                            sel
+                              ? "border-primary-500 bg-primary-50 text-primary-700"
+                              : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 block mb-1">
+                    Amount
+                  </label>
+                  <div className="relative">
+                    {settings.fee.type === "flat" && (
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        $
+                      </span>
+                    )}
+                    <input
+                      type="number"
+                      min={0}
+                      step={settings.fee.type === "flat" ? 1 : 0.1}
+                      value={settings.fee.value}
+                      onChange={(e) =>
+                        updateFee({
+                          value: Math.max(0, parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      className={`w-full ${settings.fee.type === "flat" ? "pl-6" : "pl-3"} pr-7 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
+                    />
+                    {settings.fee.type === "percentage" && (
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        %
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">
+                  Label on quote
+                </label>
+                <input
+                  type="text"
+                  value={settings.fee.label}
+                  maxLength={40}
+                  onChange={(e) => updateFee({ label: e.target.value })}
+                  placeholder="Convenience Fee"
+                  className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1.5">
+                  Apply fee to
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { v: "all" as const, label: "All payments" },
+                    { v: "card_only" as const, label: "Card only" },
+                  ].map((opt) => {
+                    const sel = settings.fee.appliesTo === opt.v;
+                    return (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => updateFee({ appliesTo: opt.v })}
+                        className={`px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                          sel
+                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                            : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500 block mb-1">
+                  Helper text shown to customer
+                </label>
+                <Textarea
+                  value={settings.fee.helperText}
+                  onChange={(e) => updateFee({ helperText: e.target.value })}
+                  placeholder="Helps cover card processing costs."
+                  rows={2}
+                />
+              </div>
+
+              {settings.fee.appliesTo === "card_only" && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                  <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    Card surcharge rules vary by state and card network. You're
+                    responsible for compliance with applicable law and your processor's
+                    terms. QuotePro does not provide legal advice.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Save row */}
+        <div className="px-5 py-3 bg-slate-50 rounded-b-2xl flex items-center justify-between">
+          <p className="text-xs text-slate-500">
+            Defaults apply to new quotes. You can override per quote.
+          </p>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={saveMutation.isPending ? undefined : savedFlash ? Check : Save}
+            disabled={!dirty || saveMutation.isPending}
+            onClick={() => saveMutation.mutate(settings)}
+          >
+            {saveMutation.isPending ? "Saving…" : savedFlash ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }

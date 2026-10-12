@@ -73,6 +73,12 @@ export default function QuotesListPage() {
   const { data: quotes = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/quotes"],
   });
+  const { data: locationsList = [] } = useQuery<Array<{ id: string; name: string; active: boolean }>>({
+    queryKey: ["/api/locations"],
+  });
+  const visibleLocations = locationsList.filter((l) => l.active);
+  const showLocationFilter = visibleLocations.length > 1;
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const tabKeyMap: Record<string, string> = {
     "all": "quotes.tabs.all",
@@ -105,10 +111,16 @@ export default function QuotesListPage() {
           ? q.status === "accepted" && q.stripeInvoiceStatus && q.stripeInvoiceStatus !== "paid"
           : q.status === filter
     )
+    .filter((q: any) => locationFilter === "all" || q.locationId === locationFilter)
     .filter(
-      (q: any) =>
-        !search ||
-        (q.customerName || "").toLowerCase().includes(search.toLowerCase())
+      (q: any) => {
+        if (!search) return true;
+        const term = search.toLowerCase();
+        return (
+          (q.customerName || "").toLowerCase().includes(term) ||
+          (q.locationName || "").toLowerCase().includes(term)
+        );
+      }
     )
     .sort((a: any, b: any) => {
       if (sortField === "amount") {
@@ -155,6 +167,21 @@ export default function QuotesListPage() {
       <Card padding={false}>
         <div className="p-4 lg:p-5 border-b border-slate-100 space-y-3">
           <Tabs tabs={tabs} active={filter} onChange={setFilter} counts={counts} />
+          {showLocationFilter ? (
+            <div className="flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">All Locations</option>
+                {visibleLocations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -233,6 +260,12 @@ export default function QuotesListPage() {
                         <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
                           <MapPin className="w-2.5 h-2.5" />
                           via Google Business Profile
+                        </span>
+                      ) : null}
+                      {showLocationFilter && q.locationName ? (
+                        <span className="inline-flex items-center gap-1 mt-1 ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {q.locationName}
                         </span>
                       ) : null}
                       <p className="text-xs text-slate-400 mt-0.5 md:hidden">

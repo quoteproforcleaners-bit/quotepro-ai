@@ -1,19 +1,19 @@
 /**
  * server/draftQuoteNudge.ts
  *
- * Weekly email to business owners who have draft quotes sitting
- * more than 2 days old that haven't been sent to any customer.
+ * Email to business owners who have draft quotes sitting unsent.
  *
  * Logic:
- * - Runs every Monday at 7am
- * - Groups draft quotes (> 2 days old) by business owner
+ * - Runs daily at 9am local
+ * - Groups draft quotes (> 4 hours old) by business owner
  * - Sends a single summary email per owner: "You have X unsent quotes"
- * - Skips owners who were notified within the last 7 days
+ * - Skips owners who were notified within the last 3 days
  *   (tracked via communications table with template_key 'draft_nudge')
  */
 
 import { pool } from "./db";
 import { sendEmail, PLATFORM_FROM_EMAIL, PLATFORM_FROM_NAME } from "./mail";
+import { acquireLock, releaseLock } from "./lockManager";
 
 const APP_BASE_URL = process.env.PUBLIC_APP_URL || "https://app.getquotepro.ai";
 
@@ -29,6 +29,19 @@ interface DraftOwner {
 }
 
 export async function processDraftQuoteNudges(): Promise<void> {
+  const got = await acquireLock("draft-nudges", 10);
+  if (!got) {
+    console.log("[draft-nudge] Skipped — another instance holds the lock.");
+    return;
+  }
+  try {
+    await runDraftQuoteNudges();
+  } finally {
+    await releaseLock("draft-nudges");
+  }
+}
+
+async function runDraftQuoteNudges(): Promise<void> {
   // 1. Find owners who have old draft quotes and haven't been nudged recently
   const result = await pool.query<DraftOwner>(`
     SELECT
@@ -44,12 +57,12 @@ export async function processDraftQuoteNudges(): Promise<void> {
     JOIN businesses b ON b.id = q.business_id
     JOIN users u ON u.id = b.owner_user_id
     WHERE q.status = 'draft'
-      AND q.created_at < NOW() - INTERVAL '2 days'
+      AND q.created_at < NOW() - INTERVAL '4 hours'
       AND NOT EXISTS (
         SELECT 1 FROM communications c
         WHERE c.business_id = b.id
           AND c.template_key = 'draft_nudge'
-          AND c.sent_at > NOW() - INTERVAL '7 days'
+          AND c.sent_at > NOW() - INTERVAL '3 days'
       )
     GROUP BY u.id, u.email, u.name, b.id, b.company_name
     HAVING COUNT(q.id) > 0

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
+import { useSubscription } from "../../lib/subscription";
 import { AnalyticsEvents } from "../../../../shared/analytics-events";
 
 function trackEvent(eventName: string, properties?: Record<string, unknown>) {
@@ -20,7 +21,26 @@ export default function OnboardingCompletePage() {
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [resendState, setResendState] = useState<ResendState>("idle");
   const { refresh, user } = useAuth();
+  const { isFree, isStarter, trackUpgradeClick } = useSubscription();
+  const showUpgradeCTA = isFree || isStarter;
   const emailedTo = fromOwnHome ? (user?.email ?? null) : null;
+  const upgradeViewedRef = useRef(false);
+
+  useEffect(() => {
+    if (showUpgradeCTA && !upgradeViewedRef.current) {
+      upgradeViewedRef.current = true;
+      apiPost("/api/analytics/events", {
+        eventName: "upgrade_cta_viewed",
+        properties: { trigger: "onboarding_complete", source: "web" },
+      }).catch(() => {});
+    }
+  }, [showUpgradeCTA]);
+
+  async function handleUpgradeClick() {
+    try { trackUpgradeClick("growth", "onboarding_complete"); } catch {}
+    await refresh();
+    navigate("/upgrade?source=onboarding_complete", { replace: true });
+  }
 
   const quoteQuery = useQuery<any>({
     queryKey: ["/api/quotes", quoteId],
@@ -156,6 +176,27 @@ export default function OnboardingCompletePage() {
             </button>
           </div>
         </div>
+
+        {showUpgradeCTA && (
+          <div style={styles.upgradeStrip}>
+            <div style={styles.upgradeStripInner}>
+              <div style={styles.upgradeIcon}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
+              <div style={styles.upgradeText}>
+                <p style={styles.upgradeHeadline}>Want this on autopilot?</p>
+                <p style={styles.upgradeSub}>
+                  Growth sends AI follow-ups 24h after every quote — operators close <strong>2–3 extra jobs/month</strong> from the same leads.
+                </p>
+              </div>
+              <button style={styles.upgradeBtn} onClick={handleUpgradeClick}>
+                Try Growth free for 7 days &rarr;
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -346,5 +387,59 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "#FCA5A5",
     color: "#991B1B",
     cursor: "pointer",
+  },
+  upgradeStrip: {
+    background: "linear-gradient(135deg, #0B5240 0%, #0F6E56 55%, #14856B 100%)",
+    borderTop: "1px solid #14856B",
+    flexShrink: 0,
+  },
+  upgradeStripInner: {
+    maxWidth: 800,
+    margin: "0 auto",
+    padding: "12px 20px",
+    display: "flex",
+    alignItems: "center",
+    gap: 14,
+    flexWrap: "wrap" as const,
+  },
+  upgradeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: "rgba(251, 191, 36, 0.18)",
+    color: "#FBBF24",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  upgradeText: {
+    flex: 1,
+    minWidth: 220,
+  },
+  upgradeHeadline: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: 700,
+    margin: "0 0 2px",
+    letterSpacing: "0.1px",
+  },
+  upgradeSub: {
+    color: "rgba(220, 252, 231, 0.92)",
+    fontSize: 12.5,
+    margin: 0,
+    lineHeight: 1.45,
+  },
+  upgradeBtn: {
+    background: "#FBBF24",
+    color: "#1F2937",
+    border: "none",
+    borderRadius: 10,
+    padding: "10px 18px",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const,
+    flexShrink: 0,
   },
 };

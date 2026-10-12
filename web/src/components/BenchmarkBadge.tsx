@@ -11,18 +11,86 @@ import { Tooltip } from"./Tooltip";
 import { compareToBenchmark, benchmarkBadgeText, NATIONAL_AVERAGES, BENCHMARK_CITATIONS } from"../lib/benchmarks";
 import type { FacilityType } from"shared/pricingEngine";
 
-// ─── Residential benchmark data (HomeAdvisor / Angi 2026) ────────────────────
+// ─── Residential benchmark data (size-bracketed) ─────────────────────────────
+// Bedroom-only benchmarks were producing false-positive "84% above" warnings
+// for larger homes priced normally per-sqft. Now bracketed by square footage,
+// which is the single biggest driver of cleaning price.
+//
+// Source baseline: Angi / HomeAdvisor 2025-2026 national data for Standard
+// Clean. Other services scale from Standard at industry-typical multipliers
+// (Deep ~1.6x, Move-In/Out ~2.0x, Post-Construction ~3.0x, Airbnb ~0.7x).
 
-const RESIDENTIAL_BENCHMARKS: Record<number, { low: number; high: number; avg: number; source: string }> = {
- 1: { low: 75, high: 110, avg: 92, source:"HomeAdvisor 2026"},
- 2: { low: 100, high: 155, avg: 127, source:"HomeAdvisor 2026"},
- 3: { low: 130, high: 185, avg: 157, source:"Angi 2026"},
- 4: { low: 175, high: 250, avg: 212, source:"Angi 2026"},
- 5: { low: 220, high: 340, avg: 278, source:"HomeAdvisor 2026"},
+export type ResidentialServiceCategory =
+  | "standard" | "recurring" | "deep" | "moveinout" | "postconstruct" | "airbnb";
+
+export type SqftBracket = "small" | "medium" | "large" | "xl" | "xxl";
+
+interface BracketRange { low: number; avg: number; high: number; }
+
+const BRACKET_LABEL: Record<SqftBracket, string> = {
+  small:  "<1,000 sqft",
+  medium: "1,000–1,800 sqft",
+  large:  "1,800–2,500 sqft",
+  xl:     "2,500–3,500 sqft",
+  xxl:    "3,500+ sqft",
 };
 
-function getResidentialBenchmark(beds: number) {
- return RESIDENTIAL_BENCHMARKS[Math.min(5, Math.max(1, beds))] ?? RESIDENTIAL_BENCHMARKS[3];
+export function getSqftBracket(sqft: number): SqftBracket {
+  if (sqft < 1000) return "small";
+  if (sqft < 1800) return "medium";
+  if (sqft < 2500) return "large";
+  if (sqft < 3500) return "xl";
+  return "xxl";
+}
+
+const STANDARD_BY_SQFT: Record<SqftBracket, BracketRange> = {
+  small:  { low: 90,  avg: 120, high: 150 },
+  medium: { low: 130, avg: 160, high: 200 },
+  large:  { low: 180, avg: 230, high: 290 },
+  xl:     { low: 230, avg: 300, high: 380 },
+  xxl:    { low: 300, avg: 400, high: 520 },
+};
+
+const SERVICE_SOURCE: Record<ResidentialServiceCategory, string> = {
+  standard:      "Angi 2026 · Standard Clean",
+  recurring:     "Angi 2026 · Recurring Clean",
+  deep:          "HomeAdvisor 2026 · Deep Clean",
+  moveinout:     "Angi 2026 · Move In/Out",
+  postconstruct: "BSCAI 2024 · Post-Construction",
+  airbnb:        "AirDNA 2026 · Turnover Clean",
+};
+
+const SERVICE_MULTIPLIER: Record<ResidentialServiceCategory, number> = {
+  standard: 1.0, recurring: 1.0, deep: 1.6, moveinout: 2.0, postconstruct: 3.0, airbnb: 0.7,
+};
+
+function scaleRange(r: BracketRange, mult: number): BracketRange {
+  return {
+    low:  Math.round(r.low  * mult),
+    avg:  Math.round(r.avg  * mult),
+    high: Math.round(r.high * mult),
+  };
+}
+
+export function getResidentialBenchmark(
+  sqft: number | undefined,
+  beds: number,
+  cleaningType?: ResidentialServiceCategory,
+): { low: number; high: number; avg: number; source: string; bracket: SqftBracket; bracketLabel: string } {
+  // sqft is the primary key; if missing, infer from bed count (rough fallback).
+  const effectiveSqft = sqft && sqft > 0 ? sqft : (beds <= 1 ? 600 : beds <= 2 ? 1200 : beds <= 3 ? 1800 : beds <= 4 ? 2600 : 3600);
+  const bracket = getSqftBracket(effectiveSqft);
+  const baseline = STANDARD_BY_SQFT[bracket];
+  const category = cleaningType ?? "standard";
+  const range = SERVICE_MULTIPLIER[category] === 1.0 ? baseline : scaleRange(baseline, SERVICE_MULTIPLIER[category]);
+  return {
+    low: range.low,
+    avg: range.avg,
+    high: range.high,
+    source: SERVICE_SOURCE[category],
+    bracket,
+    bracketLabel: BRACKET_LABEL[bracket],
+  };
 }
 
 // ─── Shared style config ─────────────────────────────────────────────────────
@@ -45,6 +113,20 @@ function positionFromPrice(price: number, low: number, high: number): Position {
  if (pct > 0.25) return"well_above";
  if (pct > 0.08) return"above";
  return"within";
+}
+
+/**
+ * Tiered position relative to a size-bracketed range.
+ * Spec:
+ *  - within bracket → "within" (in line with national pricing)
+ *  - 1–25% above high → "above" (above national average — verify scope)
+ *  - 25%+ above high → "well_above" (review your pricing)
+ *  - below low → "below" / "well_below" (verify margin)
+ */
+function bracketedPosition(price: number, low: number, high: number): Position {
+  if (price >= low && price <= high) return "within";
+  if (price > high) return price > high * 1.25 ? "well_above" : "above";
+  return price < low * 0.75 ? "well_below" : "below";
 }
 
 // ─── Prominent Price Range Slider ────────────────────────────────────────────
@@ -208,34 +290,43 @@ export function CommercialBenchmarkBadge({
 export interface ResidentialBenchmarkBadgeProps {
  visitPrice: number;
  beds: number;
+ sqft?: number;
  frequency?: string;
  size?:"full"|"compact";
+ /** When set, picks a service-type-aware benchmark range (Airbnb, Deep, Move-In/Out, Post-Construction). Defaults to Standard Clean. */
+ cleaningType?: ResidentialServiceCategory;
 }
 
 export function ResidentialBenchmarkBadge({
- visitPrice, beds, frequency, size ="full",
+ visitPrice, beds, sqft, frequency, size ="full", cleaningType,
 }: ResidentialBenchmarkBadgeProps) {
  if (!beds || beds <= 0) return null;
- const bm = getResidentialBenchmark(beds);
+ const bm = getResidentialBenchmark(sqft, beds, cleaningType);
 
- const adjustedLow = frequency ==="weekly"|| frequency ==="biweekly"? bm.low * 0.8 : bm.low;
- const adjustedHigh = frequency ==="weekly"|| frequency ==="biweekly"? bm.high * 0.8 : bm.high;
- const adjustedAvg = (adjustedLow + adjustedHigh) / 2;
+ // Recurring discount only applies to standard/recurring cleans — flat-price
+ // service types (Airbnb, deep, move-in/out, post-construction) are typically
+ // priced per visit regardless of cadence.
+ const recurringDiscountApplies = !cleaningType || cleaningType ==="standard"|| cleaningType ==="recurring";
+ const adjustedLow  = recurringDiscountApplies && (frequency ==="weekly"|| frequency ==="biweekly") ? Math.round(bm.low * 0.8) : bm.low;
+ const adjustedHigh = recurringDiscountApplies && (frequency ==="weekly"|| frequency ==="biweekly") ? Math.round(bm.high * 0.8) : bm.high;
+ const adjustedAvg = Math.round((adjustedLow + adjustedHigh) / 2);
 
- const position = positionFromPrice(visitPrice, adjustedLow, adjustedHigh);
+ const position = bracketedPosition(visitPrice, adjustedLow, adjustedHigh);
  const c = POSITION_CONFIG[position];
  const { Icon } = c;
 
- const pctVsAvg = ((visitPrice - adjustedAvg) / adjustedAvg) * 100;
- const abs = Math.abs(Math.round(pctVsAvg));
+ const pctOverHigh = visitPrice > adjustedHigh ? Math.round(((visitPrice - adjustedHigh) / adjustedHigh) * 100) : 0;
+ const pctUnderLow = visitPrice < adjustedLow ? Math.round(((adjustedLow - visitPrice) / adjustedLow) * 100) : 0;
 
  const labelMap: Record<Position, string> = {
- well_below: `${abs}% below national average — consider raising your rate`,
- below: `${abs}% below national average for a ${beds}-bed home`,
- within: `Within national range for a ${beds}-bed home`,
- above: `${abs}% above national average — justified by premium service`,
- well_above: `${abs}% above national high — review your pricing`,
+   well_below: `${pctUnderLow}% below national low — verify your margin`,
+   below:      `Below national average — verify your margin`,
+   within:     `In line with national pricing for ${bm.bracketLabel} homes`,
+   above:      `${pctOverHigh}% above national high — verify scope`,
+   well_above: `${pctOverHigh}% above national high — review your pricing`,
  };
+
+ const sourceLine = `${bm.source} · ${bm.bracketLabel}${recurringDiscountApplies && frequency && frequency !== "one-time" ? " · recurring discount applied" : ""}`;
 
  return (
  <div className={`rounded-xl border px-3 py-2.5 ${c.bg} ${c.border}`}>
@@ -246,7 +337,7 @@ export function ResidentialBenchmarkBadge({
  <p className="text-[11px] mt-0.5 leading-relaxed">{labelMap[position]}</p>
  </div>
  <Tooltip
- text={`National range for ${beds}-bedroom homes: $${Math.round(adjustedLow)}–$${Math.round(adjustedHigh)} per visit${frequency && frequency !=="one-time"?" (recurring discount applied)":""}. Average: $${Math.round(adjustedAvg)}.`}
+ text={`National range for ${bm.bracketLabel} homes (${beds}-bed): $${adjustedLow}–$${adjustedHigh} per visit. Average: $${adjustedAvg}. Note: comparison includes any pet/condition surcharges in your quote — actual market quotes for the same scope may differ.`}
  source={bm.source}
  side="left"
  />
@@ -259,7 +350,7 @@ export function ResidentialBenchmarkBadge({
    high={adjustedHigh}
    colorClass={c.text}
  />
- <p className="text-[10px] mt-2 opacity-50">Source: HomeAdvisor / Angi 2026 · one-time standard clean</p>
+ <p className="text-[10px] mt-2 opacity-50">Source: {sourceLine}</p>
  </>
  )}
  </div>
@@ -273,10 +364,12 @@ export interface TierBenchmarkPillProps {
  facilityType?: FacilityType;
  totalSqFt?: number;
  beds?: number;
+ sqft?: number;
+ cleaningType?: ResidentialServiceCategory;
  mode:"commercial"|"residential";
 }
 
-export function TierBenchmarkPill({ price, facilityType, totalSqFt, beds, mode }: TierBenchmarkPillProps) {
+export function TierBenchmarkPill({ price, facilityType, totalSqFt, beds, sqft, cleaningType, mode }: TierBenchmarkPillProps) {
  let position: Position | null = null;
  let labelShort ="";
 
@@ -287,11 +380,19 @@ export function TierBenchmarkPill({ price, facilityType, totalSqFt, beds, mode }
  const pct = Math.abs(Math.round(bm.pctVsMedian));
  labelShort = position ==="within"?"Market rate": `${pct}% ${["above","well_above"].includes(position) ?"above":"below"} avg`;
  } else if (mode ==="residential"&& beds) {
- const bm = getResidentialBenchmark(beds);
- position = positionFromPrice(price, bm.low, bm.high);
- const avg = (bm.low + bm.high) / 2;
- const pct = Math.abs(Math.round(((price - avg) / avg) * 100));
- labelShort = position ==="within"?"Market rate": `${pct}% ${["above","well_above"].includes(position) ?"above":"below"} avg`;
+ // Use the same size-bracketed source of truth as ResidentialBenchmarkBadge
+ // so the pill never disagrees with the main badge.
+ const bm = getResidentialBenchmark(sqft, beds, cleaningType);
+ position = bracketedPosition(price, bm.low, bm.high);
+ if (position === "within") {
+   labelShort = "Market rate";
+ } else if (price > bm.high) {
+   const pct = Math.round(((price - bm.high) / bm.high) * 100);
+   labelShort = `${pct}% above avg`;
+ } else {
+   const pct = Math.round(((bm.low - price) / bm.low) * 100);
+   labelShort = `${pct}% below avg`;
+ }
  }
 
  if (!position) return null;

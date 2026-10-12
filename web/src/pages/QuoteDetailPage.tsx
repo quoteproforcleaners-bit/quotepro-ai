@@ -45,6 +45,7 @@ import {
  Receipt,
  Pencil,
  Wand2,
+ ArrowRight,
 } from"lucide-react";
 import { useState, useEffect } from"react";
 import {
@@ -465,11 +466,86 @@ function QuoteDoctorModal({ quote, details, adjLow, adjAvg, adjHigh, sliderVal, 
   );
 }
 
+function FollowUpUpsellCard({
+ daysSinceSent,
+ onClick,
+}: {
+ daysSinceSent: number | null;
+ onClick: () => void;
+}) {
+ useEffect(() => {
+ apiPost("/api/analytics/events", {
+ eventName: "upgrade_cta_viewed",
+ properties: { trigger: "quote_sent_followup", source: "web", daysSinceSent },
+ }).catch(() => {});
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, []);
+
+ const ageLabel =
+ daysSinceSent === null || daysSinceSent < 1
+ ? "This quote was just sent."
+ : daysSinceSent === 1
+ ? "This quote was sent 1 day ago — and the customer hasn't replied."
+ : `This quote was sent ${daysSinceSent} days ago — and the customer hasn't replied.`;
+
+ return (
+ <div
+ style={{
+ borderRadius: 16,
+ padding: 18,
+ background: "linear-gradient(135deg, #0B5240 0%, #0F6E56 55%, #14856B 100%)",
+ color: "#fff",
+ boxShadow: "0 1px 2px rgba(15,23,42,0.06), 0 8px 24px -12px rgba(15,110,86,0.5)",
+ }}
+ >
+ <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+ <div
+ style={{
+ width: 32, height: 32, borderRadius: 8,
+ background: "rgba(251,191,36,0.18)", color: "#FBBF24",
+ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+ }}
+ >
+ <Zap className="w-4 h-4" />
+ </div>
+ <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.6px", color: "#FDE68A", textTransform: "uppercase" }}>
+ Growth feature · Auto Follow-Ups
+ </div>
+ </div>
+ <p style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "#fff" }}>
+ Don't let this one go cold.
+ </p>
+ <p style={{ fontSize: 13.5, lineHeight: 1.5, margin: "0 0 14px", color: "rgba(220,252,231,0.92)" }}>
+ {ageLabel}{" "}
+ Growth users get an AI follow-up sent automatically at 24h and again at 72h —
+ <strong> that's how operators close 2–3 extra jobs/month from quotes already sent.</strong>
+ </p>
+ <button
+ onClick={onClick}
+ style={{
+ display: "inline-flex", alignItems: "center", gap: 6,
+ background: "#FBBF24", color: "#1F2937",
+ border: "none", borderRadius: 10,
+ padding: "10px 16px", fontSize: 13, fontWeight: 700,
+ cursor: "pointer",
+ }}
+ >
+ Try Growth free for 7 days
+ <ArrowRight className="w-4 h-4" />
+ </button>
+ <p style={{ fontSize: 11.5, margin: "10px 0 0", color: "rgba(220,252,231,0.7)" }}>
+ Cancel anytime · No credit card required
+ </p>
+ </div>
+ );
+}
+
 export default function QuoteDetailPage() {
  const { id } = useParams();
  const navigate = useNavigate();
  const { business } = useAuth();
- const { isFree, isStarter, startCheckout } = useSubscription();
+ const { isFree, isStarter, startCheckout, trackUpgradeClick } = useSubscription();
+ const showFollowUpUpsell = isFree || isStarter;
  const [copied, setCopied] = useState(false);
  const [portalLinkCopied, setPortalLinkCopied] = useState(false);
  const [portalLinkLoading, setPortalLinkLoading] = useState(false);
@@ -1581,6 +1657,7 @@ export default function QuoteDetailPage() {
  <ResidentialBenchmarkBadge
  visitPrice={livePrice !== null ? livePrice : Number(quote.total || 0)}
  beds={Number(details.beds)}
+ sqft={details.sqft ? Number(details.sqft) : undefined}
  frequency={quote.frequencySelected ?? undefined}
  size="full"
  />
@@ -1687,7 +1764,17 @@ export default function QuoteDetailPage() {
  />
  ) : null}
 
- {quote.status ==="sent"? (
+ {quote.status ==="sent"&& showFollowUpUpsell ? (
+ <FollowUpUpsellCard
+ daysSinceSent={daysSinceSent}
+ onClick={() => {
+ try { trackUpgradeClick("growth","quote_sent_followup"); } catch {}
+ navigate("/upgrade?source=quote_sent_followup");
+ }}
+ />
+ ) : null}
+
+ {quote.status ==="sent"&& !showFollowUpUpsell ? (
  <Card>
  <CardHeader title="Follow-Up Automation"icon={Zap} />
  <div className="space-y-4">

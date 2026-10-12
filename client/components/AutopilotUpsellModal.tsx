@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
@@ -39,6 +40,7 @@ interface Props {
 export function AutopilotUpsellModal({ visible, onClose, tier, embedded = false }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const isGrowth = tier === "growth";
   const [purchasing, setPurchasing] = useState(false);
 
@@ -109,11 +111,8 @@ export function AutopilotUpsellModal({ visible, onClose, tier, embedded = false 
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    try {
-      const url = new URL("/pricing", getApiUrl());
-      await Linking.openURL(url.toString());
-    } catch {
-    }
+    onClose();
+    navigation.navigate("Paywall", { trigger_source: "autopilot_upsell", required_tier: "pro" });
   };
 
   const content = (

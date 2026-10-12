@@ -522,9 +522,9 @@ export default function SettingsScreen() {
           <View style={[styles.freePlanInfo, { backgroundColor: `${theme.warning}10`, borderColor: `${theme.warning}25` }]}>
             <Feather name="info" size={16} color={theme.warning} />
             <ThemedText type="small" style={{ flex: 1, marginLeft: Spacing.sm, color: theme.textSecondary }}>
-              {isInFreeTrial
-                ? `Free Trial: ${freeTrialDaysLeft} day${freeTrialDaysLeft !== 1 ? "s" : ""} left. Up to 20 quotes.`
-                : "Free Plan: 3 quotes included. No AI messaging, follow-up queue, or PDF export."}
+              {tier === "starter"
+                ? "Basic includes unlimited manual quotes. AI assistance requires the AI plan."
+                : "A paid subscription is required to create quotes. No free trial."}
             </ThemedText>
           </View>
         </View>
@@ -765,14 +765,14 @@ export default function SettingsScreen() {
           <View style={styles.freeLimitsHeader}>
             <Feather name="info" size={16} color={theme.textSecondary} />
             <ThemedText type="subtitle" style={{ marginLeft: Spacing.sm, fontWeight: "600" }}>
-              {isInFreeTrial ? `Free Trial — ${freeTrialDaysLeft} day${freeTrialDaysLeft !== 1 ? "s" : ""} left` : "Free Plan Limits"}
+              {tier === "starter" ? "Basic plan" : "Subscription required"}
             </ThemedText>
           </View>
           <View style={styles.freeLimitsList}>
             <View style={styles.freeLimitRow}>
               <Feather name="file-text" size={14} color={theme.textSecondary} />
               <ThemedText type="small" style={{ color: theme.textSecondary, marginLeft: Spacing.sm, flex: 1 }}>
-                {isInFreeTrial ? "Up to 20 quotes during your trial" : "3 residential quotes total"}
+                {tier === "starter" ? "Unlimited manual quotes" : "Subscribe to Basic or AI to create quotes"}
               </ThemedText>
             </View>
             <View style={styles.freeLimitRow}>
@@ -1742,29 +1742,28 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => navigation.navigate("LeadFinder" as any)}
+        onPress={() => navigation.navigate("AIConciergeSettings" as any)}
         style={[styles.settingsLink, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-        testID="button-lead-finder"
+        testID="button-ai-concierge-settings"
       >
         <View style={styles.settingsLinkContent}>
-          <View style={[styles.settingsLinkIcon, { backgroundColor: "#7C3AED15" }]}>
-            <Feather name="radio" size={20} color="#7C3AED" />
+          <View style={[styles.settingsLinkIcon, { backgroundColor: "#7c3aed15" }]}>
+            <Feather name="message-circle" size={20} color="#7c3aed" />
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <ThemedText type="body" style={{ fontWeight: "600" }}>Local Lead Finder</ThemedText>
-              <View style={{ backgroundColor: "#7C3AED", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
-                <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>BETA</ThemedText>
+              <ThemedText type="body" style={{ fontWeight: "600" }}>AI Concierge</ThemedText>
+              <View style={{ backgroundColor: "#7c3aed", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 }}>
+                <ThemedText style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>NEW</ThemedText>
               </View>
             </View>
             <ThemedText type="small" style={{ color: theme.textSecondary }}>
-              Find people nearby asking for cleaning help
+              Embedded chat that answers, negotiates, and books on your quote pages
             </ThemedText>
           </View>
           <Feather name="chevron-right" size={20} color={theme.textSecondary} />
         </View>
       </Pressable>
-
 
       <Pressable
         onPress={() => navigation.navigate("Autopilot" as any)}
@@ -2370,7 +2369,7 @@ export default function SettingsScreen() {
                         </ThemedText>
                       </View>
                       <ThemedText type="body" style={{ color: theme.textSecondary }}>
-                        {{ free: "Free Trial", starter: "Starter ($19/mo)", growth: "Growth ($49/mo)", pro: "Pro ($99/mo)" }[tier as string] || "Free Trial"}
+                        {{ free: "No active subscription", starter: "Basic", growth: "AI", pro: "Legacy Pro" }[tier as string] || "No active subscription"}
                       </ThemedText>
                     </View>
                   </View>

@@ -111,7 +111,15 @@ import { runPricingEngine } from "../pricingEngine";
         return res.status(404).json({ message: "Business not found" });
       }
 
-      const row = await upsertPricingSettings(business.id, req.body);
+      // Stamp setup-completion marker so the Lead Link "pricing setup
+      // incomplete" checklist can flip to ✓ as soon as the owner saves
+      // their pricing once — regardless of whether they kept the default
+      // hourly rate / minimum ticket. The old heuristic (hr !== 35/40/45,
+      // mt !== 100/80) was unreachable for owners who legitimately want
+      // those amounts.
+      const incoming = (req.body && typeof req.body === "object") ? { ...req.body } : {};
+      incoming.pricingCustomizedAt = new Date().toISOString();
+      const row = await upsertPricingSettings(business.id, incoming);
       return res.json(row.settings);
     } catch (error: any) {
       console.error("Update pricing error:", error);
