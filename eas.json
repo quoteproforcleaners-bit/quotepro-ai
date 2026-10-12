@@ -3,6 +3,17 @@
     "version": ">= 3.0.0"
   },
   "build": {
+    "testflight-sandbox": {
+      "extends": "production",
+      "distribution": "store",
+      "ios": {
+        "image": "latest",
+        "autoIncrement": true
+      },
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "hotpink-glass-commas.replit.app"
+      }
+    },
     "subscription-test": {
       "extends": "preview",
       "distribution": "internal",
