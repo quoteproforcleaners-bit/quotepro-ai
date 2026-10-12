@@ -6,6 +6,9 @@
     "subscription-test": {
       "extends": "preview",
       "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "EXPO_PUBLIC_DOMAIN": "hotpink-glass-commas.replit.app"
       }
